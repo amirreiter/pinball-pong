@@ -1,0 +1,20 @@
+{
+  "name": "pin-ball-pong",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  },
+  "dependencies": {
+    "@types/two.js": "^0.7.9",
+    "two.js": "^0.8.23"
+  }
+}
