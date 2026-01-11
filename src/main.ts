@@ -13,6 +13,7 @@ window.onload = () => {
       fullscreen: true,
       autostart: true,
       fitted: true,
+      smoothing: true,
       type: Two.Types.webgl,
     }).appendTo(document.body);
 
@@ -37,14 +38,13 @@ window.onload = () => {
       const pos = getEventPosition(e);
       isDragging = true;
       current_scene.input_start(pos);
-      current_scene.input_drag(pos);
+      current_scene.input_drag(pos, isDragging);
     };
 
     const handleDrag = (e: MouseEvent | TouchEvent) => {
-      if (!isDragging) return;
       e.preventDefault();
       const pos = getEventPosition(e);
-      current_scene.input_drag(pos);
+      current_scene.input_drag(pos, isDragging);
     };
 
     const handleUp = (e: MouseEvent | TouchEvent) => {
