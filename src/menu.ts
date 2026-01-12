@@ -6,52 +6,9 @@ import { encode as b64encode, decode as b64decode } from "uint8-base64";
 
 import { Scene } from "./scene";
 
-// Prune SDP data that is not necessary for JSON data transmission use case
-// (Thanks Claude!)
-function prune_sdp(sdp: string): string {
-  // Remove media lines that aren't data channels
-  const lines = sdp.split('\r\n');
-  const prunedLines: string[] = [];
-  let inDataMedia = false;
-  let skipMedia = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Track media sections
-    if (line.startsWith('m=')) {
-      if (line.startsWith('m=application')) {
-        inDataMedia = true;
-        skipMedia = false;
-      } else {
-        inDataMedia = false;
-        skipMedia = true;
-      }
-    }
-
-    // Keep session-level attributes and data channel media
-    if (!skipMedia) {
-      // Remove unnecessary attributes even in data sections
-      if (
-        line.startsWith('a=ice-options:') ||
-        line.startsWith('a=extmap:') ||
-        line.startsWith('a=msid-semantic:') ||
-        line.startsWith('a=group:')
-      ) {
-        continue;
-      }
-      prunedLines.push(line);
-    }
-  }
-
-  const pruned = prunedLines.join('\r\n');
-
-  return pruned;
-}
-
 function generate_invite(sdp: string): string {
   const encoder = new TextEncoder();
-  const payload = encoder.encode(prune_sdp(sdp));
+  const payload = encoder.encode(sdp);
   const payload_lz4 = lz4.compress(payload);
   const payload_lz4_b64 = b64encode(payload_lz4);
 
@@ -68,17 +25,17 @@ function parse_invite(invite: string): string {
 }
 
 export class MenuScene implements Scene {
-  title1: ReturnType<Two["makeText"]>;
-  title2: ReturnType<Two["makeText"]>;
+  private title1: ReturnType<Two["makeText"]>;
+  private title2: ReturnType<Two["makeText"]>;
 
-  btn_singleplayer_text: ReturnType<Two["makeText"]>;
-  btn_singleplayer_bg: ReturnType<Two["makeRectangle"]>;
+  private btn_singleplayer_text: ReturnType<Two["makeText"]>;
+  private btn_singleplayer_bg: ReturnType<Two["makeRectangle"]>;
 
-  btn_multiplayer_text: ReturnType<Two["makeText"]>;
-  btn_multiplayer_bg: ReturnType<Two["makeRectangle"]>;
+  private btn_multiplayer_text: ReturnType<Two["makeText"]>;
+  private btn_multiplayer_bg: ReturnType<Two["makeRectangle"]>;
 
-  btn_host_text: ReturnType<Two["makeText"]>;
-  btn_host_bg: ReturnType<Two["makeRectangle"]>;
+  private btn_host_text: ReturnType<Two["makeText"]>;
+  private btn_host_bg: ReturnType<Two["makeRectangle"]>;
 
   constructor(ctx: Two) {
     const w = ctx.width;
@@ -185,8 +142,23 @@ export class MenuScene implements Scene {
 
     if (this.btn_host_bg.contains(pos.x, pos.y)) {
       (async () => {
+        // Request media permissions before continuing.
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (err) {
+          console.error("Camera permission denied:", err);
+          return;
+        }
+
         const pc = new RTCPeerConnection({
-          iceServers: [],
+          iceServers: [
+            {
+              urls: ["stun:stun.l.google.com:19302"],
+            },
+          ],
         });
 
         let data_channel = pc.createDataChannel("pong");
@@ -246,7 +218,8 @@ export class MenuScene implements Scene {
 
                 container
                   .querySelector("#next")!
-                  .addEventListener("click", () => {
+                  .addEventListener("pointerdown", (e) => {
+                    e.preventDefault();
                     //
                     // HOST INVITE RESPONSE SCANNING
                     //
@@ -289,9 +262,24 @@ export class MenuScene implements Scene {
       })();
     } else if (this.btn_multiplayer_bg.contains(pos.x, pos.y)) {
       (async () => {
+        // Request media permissions before continuing.
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (err) {
+          console.error("Camera permission denied:", err);
+          return;
+        }
+
         // Set up WebRTC
         const pc = new RTCPeerConnection({
-          iceServers: [],
+          iceServers: [
+            {
+              urls: ["stun:stun.l.google.com:19302"],
+            },
+          ],
         });
 
         pc.ondatachannel = (event) => {
