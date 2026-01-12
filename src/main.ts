@@ -3,12 +3,12 @@ import Two from "two.js";
 import { Scene } from "./scene";
 import { MenuScene } from "./menu";
 
-document.addEventListener('DOMContentLoaded', async function () {
+document.addEventListener("DOMContentLoaded", async function () {
   await document.fonts.load("32px 'Press Start 2P'");
 
-  const CANVAS: HTMLCanvasElement = document.getElementById(
-    "canvas",
-  )! as HTMLCanvasElement;
+  const GAME_CONTAINER = document.getElementById(
+    "game",
+  )!;
 
   const TWO = new Two({
     fullscreen: true,
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     fitted: true,
     smoothing: true,
     type: Two.Types.webgl,
-  }).appendTo(document.body);
+  }).appendTo(GAME_CONTAINER);
 
   let current_scene: Scene = new MenuScene(TWO);
 
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   window.addEventListener("mousedown", handleDown);
   window.addEventListener("mousemove", handleDrag);
   window.addEventListener("mouseup", handleUp);
-
+  window.addEventListener("mousemove", handleDrag);
   window.addEventListener("touchstart", handleDown, { passive: false });
   window.addEventListener("touchmove", handleDrag, { passive: false });
   window.addEventListener("touchend", handleUp, { passive: false });

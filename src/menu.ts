@@ -1,6 +1,56 @@
 import Two from "two.js";
+import QRCode from "qrcode";
+import { Html5Qrcode } from "html5-qrcode";
+import * as lz4 from "@nick/lz4";
+import { encode as b64encode, decode as b64decode } from "uint8-base64";
 
 import { Scene } from "./scene";
+import {
+  isValidHtml5QrcodeSupportedFormats,
+  QrcodeResultFormat,
+} from "html5-qrcode/esm/core";
+
+// Minify WebRTC SDP data so it fits more easily onto a QR code.
+function pruneSDP(sdp: string) {
+  return sdp
+    .split("\r\n")
+    .filter((line) => {
+      return (
+        line.startsWith("v=") ||
+        line.startsWith("o=") ||
+        line.startsWith("s=") ||
+        line.startsWith("c=IN") ||
+        line.startsWith("t=") ||
+        line.startsWith("a=ice-ufrag") ||
+        line.startsWith("a=ice-pwd") ||
+        line.startsWith("a=fingerprint") ||
+        line.startsWith("a=setup") ||
+        line.startsWith("a=mid") ||
+        line.startsWith("a=group:BUNDLE") ||
+        line.startsWith("a=sctp-port") ||
+        line.startsWith("a=candidate")
+      );
+    })
+    .join("\r\n");
+}
+
+function generate_invite(sdp: string): string {
+  const encoder = new TextEncoder();
+  const payload = encoder.encode(sdp);
+  const payload_lz4 = lz4.compress(payload);
+  const payload_lz4_b64 = b64encode(payload_lz4);
+
+  return new TextDecoder("utf8").decode(payload_lz4_b64);
+}
+
+function parse_invite(invite: string): string {
+  const encoder = new TextEncoder();
+  const invite_bytes = encoder.encode(invite);
+  const payload_lz4 = b64decode(invite_bytes);
+  const payload = lz4.decompress(payload_lz4);
+
+  return new TextDecoder("utf8").decode(payload);
+}
 
 export class MenuScene implements Scene {
   title1: ReturnType<Two["makeText"]>;
@@ -48,7 +98,7 @@ export class MenuScene implements Scene {
 
     this.btn_multiplayer_bg = ctx.makeRectangle(0, 0, 600, 100);
     this.btn_multiplayer_bg.linewidth = 4;
-    this.btn_multiplayer_text = ctx.makeText("Multiplayer (LAN)", 0, 0, {
+    this.btn_multiplayer_text = ctx.makeText("Multiplayer", 0, 0, {
       size: 32,
       family: "'Press Start 2P'",
       alignment: "center",
@@ -100,7 +150,7 @@ export class MenuScene implements Scene {
     this.title2.position.set(w / 2 - 100, h / 3 - 66 - 50);
     this.title2.rotation = -0.05 + Math.sin(frameCount * 0.03) * 0.05;
 
-    this.btn_singleplayer_text.position.set(w / 2, h / 2  - 25);
+    this.btn_singleplayer_text.position.set(w / 2, h / 2 - 25);
     this.btn_singleplayer_bg.position.set(w / 2, h / 2 - 25);
 
     this.btn_multiplayer_text.position.set(w / 2, h / 2 + 125);
@@ -113,6 +163,217 @@ export class MenuScene implements Scene {
   }
 
   input_start(pos: { x: number; y: number }): null {
+    // Discard input if we have an HTML popup above the canvas
+    if (document.querySelector(".popup") != undefined) {
+      return null;
+    }
+
+    if (this.btn_host_bg.contains(pos.x, pos.y)) {
+      (async () => {
+        const pc = new RTCPeerConnection({
+          iceServers: [],
+        });
+
+        let data_channel = pc.createDataChannel("pong");
+
+        data_channel.onopen = (event) => {
+          console.log("Connection established!");
+          data_channel.send("REQUEST_CONFIRM_WEBSOCKET_OPEN");
+        };
+
+        data_channel.onmessage = (msg) => {
+          if (msg.data === "CLIENT_READY") {
+            data_channel.send("HOST_READY");
+            console.log("Client connection confirmed");
+          }
+        };
+
+        const offer = await pc.createOffer();
+        // offer.sdp = pruneSDP(offer.sdp!)
+        await pc.setLocalDescription(offer);
+
+        pc.onicegatheringstatechange = () => {
+          if (pc.iceGatheringState === "complete") {
+            //
+            // HOST INVITE GENERATION
+            //
+            const invite = generate_invite(offer.sdp!);
+
+            document.body.insertAdjacentHTML(
+              "afterbegin",
+              "<div id='qr-display' class='popup' style='position: fixed; top: 0; left: 0; z-index: 100; width: 100vw; min-height: 100vh; height: 100%; background: white;'></div>",
+            );
+
+            QRCode.toCanvas(
+              invite,
+              { errorCorrectionLevel: "medium", width: window.innerWidth },
+              function (err, canvas) {
+                if (err) throw err;
+
+                const maxSize = Math.min(
+                  window.innerHeight - 150,
+                  window.innerWidth,
+                );
+                canvas.style.width = `${maxSize}px`;
+                canvas.style.height = "auto";
+                canvas.style.position = "relative";
+                canvas.style.zIndex = "100";
+                canvas.style.display = "block";
+                canvas.style.marginLeft = "auto";
+                canvas.style.marginRight = "auto";
+
+                var container = document.getElementById("qr-display")!;
+                container.appendChild(canvas);
+
+                container.insertAdjacentHTML(
+                  "beforeend",
+                  "<button id='next' style='display: block; margin: 24px auto 0 auto; padding: 16px 24px; background: black; color: white; border: 4px solid white; font-family: \"Press Start 2P\"; font-size: 16px; text-align: center; cursor: pointer;'>Next</button>",
+                );
+
+                container
+                  .querySelector("#next")!
+                  .addEventListener("click", () => {
+                    //
+                    // HOST INVITE RESPONSE SCANNING
+                    //
+                    document.body.querySelector("#qr-display")!.remove();
+
+                    // Scan QR Code
+                    document.body.insertAdjacentHTML(
+                      "afterbegin",
+                      "<div id='qr-reader' class='popup' style='position: fixed; top: 0; left: 0; z-index: 100; width: 100vw; min-height: 100vh; height: 100%; background: white;'></div>",
+                    );
+
+                    document.body
+                      .querySelector("#qr-reader")
+                      ?.insertAdjacentHTML(
+                        "afterbegin",
+                        "<div id='qr-scanner' style: width: 100vw;>",
+                      );
+
+                    const html5QrCode = new Html5Qrcode("qr-scanner");
+
+                    html5QrCode.start(
+                      { facingMode: "environment" },
+                      { fps: 24 },
+                      async (text) => {
+                        document.body.querySelector("#qr-reader")!.remove();
+                        await html5QrCode.stop();
+
+                        await pc.setRemoteDescription({
+                          type: "answer",
+                          sdp: parse_invite(text),
+                        });
+                      },
+                      (_err) => {},
+                    );
+                  });
+              },
+            );
+          }
+        };
+      })();
+    } else if (this.btn_multiplayer_bg.contains(pos.x, pos.y)) {
+      (async () => {
+        // Set up WebRTC
+        const pc = new RTCPeerConnection({
+          iceServers: [],
+        });
+
+        pc.ondatachannel = (event) => {
+          const data_channel = event.channel;
+
+          data_channel.onopen = () => {
+            console.log("Client channel open");
+            data_channel.send("CLIENT_READY");
+          };
+
+          data_channel.onmessage = (msg) => {
+            if (msg.data === "HOST_READY") {
+              console.log("Host acknowledged");
+              document.getElementById("qr-display")?.remove();
+            }
+          };
+        };
+
+        //
+        // CLIENT INVITE RESPONSE SCANNING
+        //
+        document.body.insertAdjacentHTML(
+          "afterbegin",
+          "<div id='qr-reader' class='popup' style='position: fixed; top: 0; left: 0; z-index: 100; width: 100vw; min-height: 100vh; height: 100%; background: white;'></div>",
+        );
+
+        document.body
+          .querySelector("#qr-reader")
+          ?.insertAdjacentHTML(
+            "afterbegin",
+            "<div id='qr-scanner' style: width: 100vw;>",
+          );
+
+        const html5QrCode = new Html5Qrcode("qr-scanner");
+
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 24 },
+          async (text) => {
+            document.body.querySelector("#qr-reader")!.remove();
+            await html5QrCode.stop();
+
+            const sdp = parse_invite(text);
+
+            await pc.setRemoteDescription({
+              type: "offer",
+              sdp: sdp,
+            });
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            pc.onicegatheringstatechange = () => {
+              if (pc.iceGatheringState === "complete") {
+                const answerSdp = pc.localDescription!.sdp;
+                // const pruned = pruneSDP(answerSdp);
+
+                const invite_answer = generate_invite(answerSdp);
+
+                //
+                // CLIENT INVITE GENERATION
+                //
+                document.body.insertAdjacentHTML(
+                  "afterbegin",
+                  "<div id='qr-display' class='popup' style='position: fixed; top: 0; left: 0; z-index: 100; width: 100vw; min-height: 100vh; height: 100%; background: white;'></div>",
+                );
+
+                QRCode.toCanvas(
+                  invite_answer,
+                  { errorCorrectionLevel: "medium", width: window.innerWidth },
+                  function (err, canvas) {
+                    if (err) throw err;
+
+                    const maxSize = Math.min(
+                      window.innerHeight - 150,
+                      window.innerWidth,
+                    );
+                    canvas.style.width = `${maxSize}px`;
+                    canvas.style.height = "auto";
+                    canvas.style.position = "relative";
+                    canvas.style.zIndex = "100";
+                    canvas.style.display = "block";
+                    canvas.style.marginLeft = "auto";
+                    canvas.style.marginRight = "auto";
+
+                    var container = document.getElementById("qr-display")!;
+                    container.appendChild(canvas);
+                  },
+                );
+              }
+            };
+          },
+          (_err) => {},
+        );
+      })();
+    }
+
     return null;
   }
 
