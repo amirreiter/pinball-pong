@@ -5,38 +5,53 @@ import * as lz4 from "@nick/lz4";
 import { encode as b64encode, decode as b64decode } from "uint8-base64";
 
 import { Scene } from "./scene";
-import {
-  isValidHtml5QrcodeSupportedFormats,
-  QrcodeResultFormat,
-} from "html5-qrcode/esm/core";
 
-// Minify WebRTC SDP data so it fits more easily onto a QR code.
-function pruneSDP(sdp: string) {
-  return sdp
-    .split("\r\n")
-    .filter((line) => {
-      return (
-        line.startsWith("v=") ||
-        line.startsWith("o=") ||
-        line.startsWith("s=") ||
-        line.startsWith("c=IN") ||
-        line.startsWith("t=") ||
-        line.startsWith("a=ice-ufrag") ||
-        line.startsWith("a=ice-pwd") ||
-        line.startsWith("a=fingerprint") ||
-        line.startsWith("a=setup") ||
-        line.startsWith("a=mid") ||
-        line.startsWith("a=group:BUNDLE") ||
-        line.startsWith("a=sctp-port") ||
-        line.startsWith("a=candidate")
-      );
-    })
-    .join("\r\n");
+// Prune SDP data that is not necessary for JSON data transmission use case
+// (Thanks Claude!)
+function prune_sdp(sdp: string): string {
+  // Remove media lines that aren't data channels
+  const lines = sdp.split('\r\n');
+  const prunedLines: string[] = [];
+  let inDataMedia = false;
+  let skipMedia = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Track media sections
+    if (line.startsWith('m=')) {
+      if (line.startsWith('m=application')) {
+        inDataMedia = true;
+        skipMedia = false;
+      } else {
+        inDataMedia = false;
+        skipMedia = true;
+      }
+    }
+
+    // Keep session-level attributes and data channel media
+    if (!skipMedia) {
+      // Remove unnecessary attributes even in data sections
+      if (
+        line.startsWith('a=ice-options:') ||
+        line.startsWith('a=extmap:') ||
+        line.startsWith('a=msid-semantic:') ||
+        line.startsWith('a=group:')
+      ) {
+        continue;
+      }
+      prunedLines.push(line);
+    }
+  }
+
+  const pruned = prunedLines.join('\r\n');
+
+  return pruned;
 }
 
 function generate_invite(sdp: string): string {
   const encoder = new TextEncoder();
-  const payload = encoder.encode(sdp);
+  const payload = encoder.encode(prune_sdp(sdp));
   const payload_lz4 = lz4.compress(payload);
   const payload_lz4_b64 = b64encode(payload_lz4);
 
@@ -189,7 +204,6 @@ export class MenuScene implements Scene {
         };
 
         const offer = await pc.createOffer();
-        // offer.sdp = pruneSDP(offer.sdp!)
         await pc.setLocalDescription(offer);
 
         pc.onicegatheringstatechange = () => {
@@ -332,7 +346,6 @@ export class MenuScene implements Scene {
             pc.onicegatheringstatechange = () => {
               if (pc.iceGatheringState === "complete") {
                 const answerSdp = pc.localDescription!.sdp;
-                // const pruned = pruneSDP(answerSdp);
 
                 const invite_answer = generate_invite(answerSdp);
 
