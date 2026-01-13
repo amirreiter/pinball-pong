@@ -18,6 +18,7 @@
     "@nick/lz4": "npm:@jsr/nick__lz4",
     "@types/qrcode": "^1.5.6",
     "@types/two.js": "^0.7.9",
+    "fflate": "^0.8.2",
     "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.4",
     "two.js": "^0.8.23",

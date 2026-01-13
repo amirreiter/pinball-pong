@@ -5,6 +5,8 @@ import * as lz4 from "@nick/lz4";
 import { encode as b64encode, decode as b64decode } from "uint8-base64";
 
 import { Scene } from "./scene";
+import { Game } from "./game";
+import { MultiplayerSession } from "./multiplayer";
 
 function generate_invite(sdp: string): string {
   const encoder = new TextEncoder();
@@ -37,7 +39,20 @@ export class MenuScene implements Scene {
   private btn_host_text: ReturnType<Two["makeText"]>;
   private btn_host_bg: ReturnType<Two["makeRectangle"]>;
 
+  private next_scene:
+    | "singleplayer"
+    | "multiplayer_host"
+    | "multiplayer_client"
+    | null;
+
+  private multiplayer_pc: RTCPeerConnection | null;
+  private multiplayer_channel: RTCDataChannel | null;
+
   constructor(ctx: Two) {
+    this.multiplayer_pc = null;
+    this.next_scene = null;
+    this.multiplayer_channel = null;
+
     const w = ctx.width;
     const h = ctx.height;
 
@@ -102,6 +117,26 @@ export class MenuScene implements Scene {
   }
 
   tick(ctx: Two, frameCount: number, dt: number): Scene | null {
+    if (this.next_scene == "multiplayer_host") {
+      const session_wrapper = new MultiplayerSession(
+        this.multiplayer_pc!,
+        this.multiplayer_channel!,
+      );
+
+      const scene = new Game(ctx, session_wrapper, true);
+
+      return scene;
+    } else if (this.next_scene == "multiplayer_client") {
+      const session_wrapper = new MultiplayerSession(
+        this.multiplayer_pc!,
+        this.multiplayer_channel!,
+      );
+
+      const scene = new Game(ctx, session_wrapper, false);
+
+      return scene;
+    }
+
     const w = ctx.width;
     const h = ctx.height;
 
@@ -154,24 +189,18 @@ export class MenuScene implements Scene {
         }
 
         const pc = new RTCPeerConnection({
-          iceServers: [
-            {
-              urls: ["stun:stun.l.google.com:19302"],
-            },
-          ],
+          iceServers:  [{ urls: ["stun:stun.l.google.com:19302"] }],
         });
 
         let data_channel = pc.createDataChannel("pong");
 
-        data_channel.onopen = (event) => {
-          console.log("Connection established!");
-          data_channel.send("REQUEST_CONFIRM_WEBSOCKET_OPEN");
-        };
-
         data_channel.onmessage = (msg) => {
           if (msg.data === "CLIENT_READY") {
             data_channel.send("HOST_READY");
-            console.log("Client connection confirmed");
+
+            this.next_scene = "multiplayer_host";
+            this.multiplayer_pc = pc;
+            this.multiplayer_channel = data_channel;
           }
         };
 
@@ -193,7 +222,7 @@ export class MenuScene implements Scene {
             QRCode.toCanvas(
               invite,
               { errorCorrectionLevel: "medium", width: window.innerWidth },
-              function (err, canvas) {
+              (err, canvas) => {
                 if (err) throw err;
 
                 const maxSize = Math.min(
@@ -275,25 +304,22 @@ export class MenuScene implements Scene {
 
         // Set up WebRTC
         const pc = new RTCPeerConnection({
-          iceServers: [
-            {
-              urls: ["stun:stun.l.google.com:19302"],
-            },
-          ],
+          iceServers:  [{ urls: ["stun:stun.l.google.com:19302"] }],
         });
-
         pc.ondatachannel = (event) => {
           const data_channel = event.channel;
 
           data_channel.onopen = () => {
-            console.log("Client channel open");
             data_channel.send("CLIENT_READY");
           };
 
           data_channel.onmessage = (msg) => {
             if (msg.data === "HOST_READY") {
-              console.log("Host acknowledged");
               document.getElementById("qr-display")?.remove();
+
+              this.next_scene = "multiplayer_client";
+              this.multiplayer_pc = pc;
+              this.multiplayer_channel = data_channel;
             }
           };
         };

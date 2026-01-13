@@ -3,6 +3,12 @@ import Two from "two.js";
 import { Scene } from "./scene";
 import { MenuScene } from "./menu";
 
+declare global {
+  interface Window {
+    current_scene: Scene;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
   await document.fonts.load("32px 'Press Start 2P'");
 
@@ -18,10 +24,15 @@ document.addEventListener("DOMContentLoaded", async function () {
     type: Two.Types.webgl,
   }).appendTo(GAME_CONTAINER);
 
-  let current_scene: Scene = new MenuScene(TWO);
+  window.current_scene = new MenuScene(TWO);
 
   TWO.bind("update", (frameCount: number, dt: number) => {
-    current_scene.tick(TWO, frameCount, dt);
+    const maybe_scene = window.current_scene.tick(TWO, frameCount, dt);
+
+    if (maybe_scene !== null) {
+      window.current_scene = maybe_scene;
+      TWO.clear()
+    }
   });
 
   const getEventPosition = (e: MouseEvent | TouchEvent) => {
@@ -38,14 +49,14 @@ document.addEventListener("DOMContentLoaded", async function () {
     e.preventDefault();
     const pos = getEventPosition(e);
     isDragging = true;
-    current_scene.input_start(pos);
-    current_scene.input_drag(pos, isDragging);
+    window.current_scene.input_start(pos);
+    window.current_scene.input_drag(pos, isDragging);
   };
 
   const handleDrag = (e: MouseEvent | TouchEvent) => {
     e.preventDefault();
     const pos = getEventPosition(e);
-    current_scene.input_drag(pos, isDragging);
+    window.current_scene.input_drag(pos, isDragging);
   };
 
   const handleUp = (e: MouseEvent | TouchEvent) => {
@@ -53,7 +64,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     e.preventDefault();
     const pos = getEventPosition(e);
     isDragging = false;
-    current_scene.input_end(pos);
+    window.current_scene.input_end(pos);
   };
 
   window.addEventListener("mousedown", handleDown);
