@@ -30,8 +30,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     const maybe_scene = window.current_scene.tick(TWO, frameCount, dt);
 
     if (maybe_scene !== null) {
+      console.log("Switching Scene")
       window.current_scene = maybe_scene;
-      TWO.clear()
     }
   });
 

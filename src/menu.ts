@@ -119,6 +119,7 @@ export class MenuScene implements Scene {
   tick(ctx: Two, frameCount: number, dt: number): Scene | null {
     if (this.next_scene == "multiplayer_host") {
       const session_wrapper = new MultiplayerSession(
+        "server",
         this.multiplayer_pc!,
         this.multiplayer_channel!,
       );
@@ -128,11 +129,16 @@ export class MenuScene implements Scene {
       return scene;
     } else if (this.next_scene == "multiplayer_client") {
       const session_wrapper = new MultiplayerSession(
+        "client",
         this.multiplayer_pc!,
         this.multiplayer_channel!,
       );
 
       const scene = new Game(ctx, session_wrapper, false);
+
+      return scene;
+    } else if (this.next_scene == "singleplayer") {
+      const scene = new Game(ctx, undefined, true);
 
       return scene;
     }
@@ -399,8 +405,9 @@ export class MenuScene implements Scene {
           (_err) => {},
         );
       })();
+    } else if (this.btn_singleplayer_bg.contains(pos.x, pos.y)) {
+      this.next_scene = "singleplayer"
     }
-
     return null;
   }
 

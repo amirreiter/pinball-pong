@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@nick/lz4": "npm:@jsr/nick__lz4",
+    "@se-oss/crc32": "^1.0.0",
     "@types/qrcode": "^1.5.6",
     "@types/two.js": "^0.7.9",
     "fflate": "^0.8.2",
