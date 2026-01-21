@@ -5,9 +5,12 @@ import { Scene } from "./scene";
 import { Vector } from "two.js/src/vector";
 import { Group } from "two.js/src/group";
 
-const PADDLE_SIZE_Y: number = 200;
-const PADDLE_SIZE_X: number = 25;
-const BALL_RADIUS: number = 20;
+const PADDLE_SIZE_Y: number = 220;
+const PADDLE_SIZE_X: number = 35;
+const BALL_RADIUS: number = 25;
+
+const BUTTON_OFF_COLOR = "#5A1A1A";
+const BUTTON_ON_COLOR = "#FF1A1A";
 
 class World {
   private group: Group;
@@ -87,9 +90,14 @@ export class Game implements Scene {
   private counter: ReturnType<Two["makeText"]>;
 
   private slider_bg: ReturnType<Two["makeRoundedRectangle"]>;
+  private slider_track: ReturnType<Two["makeRoundedRectangle"]>;
   private slider_handle: ReturnType<Two["makeGroup"]>;
 
+  private top_btn: ReturnType<Two["makeCircle"]>;
+  private bottom_btn: ReturnType<Two["makeCircle"]>;
+
   private paddle_input: number;
+  private flipper_control: "top" | "bottom" | false;
 
   constructor(
     ctx: Two,
@@ -133,11 +141,15 @@ export class Game implements Scene {
 
     // Controls
     this.paddle_input = 0;
+    this.flipper_control = false;
 
     this.slider_bg = ctx.makeRoundedRectangle(0, 0, 0, 0, 8);
     this.slider_bg.fill = "#1A1A1A";
     this.slider_bg.stroke = "#808080";
     this.slider_bg.linewidth = 3;
+
+    this.slider_track = ctx.makeRoundedRectangle(0, 0, 0, 0, 8);
+    this.slider_track.fill = "black";
 
     this.slider_handle = ctx.makeGroup([
       // Handle
@@ -169,6 +181,14 @@ export class Game implements Scene {
         return line;
       })(),
     ]);
+
+    this.top_btn = ctx.makeCircle(0, 0, 42);
+    this.top_btn.fill = BUTTON_OFF_COLOR;
+    this.top_btn.stroke = "#A08080";
+
+    this.bottom_btn = ctx.makeCircle(0, 0, 42);
+    this.bottom_btn.fill = BUTTON_OFF_COLOR;
+    this.bottom_btn.stroke = "#A08080";
   }
 
   tick(ctx: Two, frameCount: number, dt: number): Scene | null {
@@ -273,12 +293,40 @@ export class Game implements Scene {
     this.slider_bg.position.set(w / 1.25, h - 115);
     this.slider_bg.width = h / 6;
     this.slider_bg.height = 200;
+
     this.slider_handle.scale = (h / 6 / 1000) * 0.8;
-    this.slider_handle.position.set(w / 1.25, h - 115 + this.paddle_input * 150);
+    this.slider_handle.position.set(
+      w / 1.25,
+      h - 115 + this.paddle_input * 150,
+    );
+
+    this.slider_track.position.set(w / 1.25, h - 115);
+    this.slider_track.width = 15;
+    this.slider_track.height = 180;
+
+    this.top_btn.position.set(w - w / 1.25, h - 115 - 50);
+    this.bottom_btn.position.set(w - w / 1.25, h - 115 + 50);
+
+    if (this.flipper_control == "top") {
+      this.top_btn.fill = BUTTON_ON_COLOR;
+      this.bottom_btn.fill = BUTTON_OFF_COLOR;
+    } else if (this.flipper_control == "bottom") {
+      this.bottom_btn.fill = BUTTON_ON_COLOR;
+      this.top_btn.fill = BUTTON_OFF_COLOR;
+    } else {
+      this.top_btn.fill = BUTTON_OFF_COLOR;
+      this.bottom_btn.fill = BUTTON_OFF_COLOR;
+    }
 
     return null;
   }
   input_start(pos: { x: number; y: number }): null {
+    if (this.top_btn.contains(pos.x, pos.y)) {
+      this.flipper_control = "top";
+    } else if (this.bottom_btn.contains(pos.x, pos.y)) {
+      this.flipper_control = "bottom";
+    }
+
     this.grab_slider(pos.x, pos.y);
     return null;
   }
@@ -288,16 +336,28 @@ export class Game implements Scene {
   }
   input_end(pos: { x: number; y: number }): null {
     this.paddle_input = 0;
+    this.flipper_control = false;
     return null;
   }
 
   private grab_slider(x: number, y: number) {
     const rect = this.slider_bg.getBoundingClientRect(true);
 
-    const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
+    if (
+      x < rect.left ||
+      y < rect.top - 150 ||
+      y > rect.bottom + 150
+    ) {
+      this.paddle_input = 0;
+      return;
+    }
+
+    const clamp = (num: number, min: number, max: number) =>
+      Math.min(Math.max(num, min), max);
 
     const pos = this.slider_bg.position.y;
 
-    this.paddle_input = clamp(y - pos, rect.top - pos, rect.bottom - pos) / (rect.bottom - rect.top)
+    this.paddle_input =
+      clamp(y - pos, rect.top - pos, rect.bottom - pos) / rect.height;
   }
 }
