@@ -195,7 +195,7 @@ export class MenuScene implements Scene {
         }
 
         const pc = new RTCPeerConnection({
-          iceServers:  [{ urls: ["stun:stun.l.google.com:19302"] }],
+          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
         });
 
         let data_channel = pc.createDataChannel("pong");
@@ -310,7 +310,7 @@ export class MenuScene implements Scene {
 
         // Set up WebRTC
         const pc = new RTCPeerConnection({
-          iceServers:  [{ urls: ["stun:stun.l.google.com:19302"] }],
+          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
         });
         pc.ondatachannel = (event) => {
           const data_channel = event.channel;
@@ -406,7 +406,7 @@ export class MenuScene implements Scene {
         );
       })();
     } else if (this.btn_singleplayer_bg.contains(pos.x, pos.y)) {
-      this.next_scene = "singleplayer"
+      this.next_scene = "singleplayer";
     }
     return null;
   }
