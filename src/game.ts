@@ -5,7 +5,7 @@ import { Scene } from "./scene";
 import { Vector } from "two.js/src/vector";
 import { Group } from "two.js/src/group";
 
-const PADDLE_SIZE_Y: number = 150;
+const PADDLE_SIZE_Y: number = 200;
 const PADDLE_SIZE_X: number = 25;
 const BALL_RADIUS: number = 20;
 
@@ -86,6 +86,11 @@ export class Game implements Scene {
 
   private counter: ReturnType<Two["makeText"]>;
 
+  private slider_bg: ReturnType<Two["makeRoundedRectangle"]>;
+  private slider_handle: ReturnType<Two["makeGroup"]>;
+
+  private paddle_input: number;
+
   constructor(
     ctx: Two,
     multiplayer: MultiplayerSession | undefined,
@@ -125,6 +130,45 @@ export class Game implements Scene {
         this.world.ball_velocity.set(new_velocity.x, new_velocity.y);
       };
     }
+
+    // Controls
+    this.paddle_input = 0;
+
+    this.slider_bg = ctx.makeRoundedRectangle(0, 0, 0, 0, 8);
+    this.slider_bg.fill = "#1A1A1A";
+    this.slider_bg.stroke = "#808080";
+    this.slider_bg.linewidth = 3;
+
+    this.slider_handle = ctx.makeGroup([
+      // Handle
+      (() => {
+        let handle = ctx.makeRoundedRectangle(0, 0, 1000, 366, 35);
+        handle.fill = "#505050";
+        return handle;
+      })(),
+      // Deco grab lines
+      (() => {
+        let line = ctx.makeLine(-300, -75, 300, -75);
+        line.stroke = "#A0A0A0";
+        line.linewidth = 30;
+        line.cap = "round";
+        return line;
+      })(),
+      (() => {
+        let line = ctx.makeLine(-300, 0, 300, 0);
+        line.stroke = "#A0A0A0";
+        line.linewidth = 30;
+        line.cap = "round";
+        return line;
+      })(),
+      (() => {
+        let line = ctx.makeLine(-300, 75, 300, 75);
+        line.stroke = "#A0A0A0";
+        line.linewidth = 30;
+        line.cap = "round";
+        return line;
+      })(),
+    ]);
   }
 
   tick(ctx: Two, frameCount: number, dt: number): Scene | null {
@@ -225,15 +269,35 @@ export class Game implements Scene {
 
     this.world.tick(20, 60, w - 40, h - 200);
 
+    // Controls
+    this.slider_bg.position.set(w / 1.25, h - 115);
+    this.slider_bg.width = h / 6;
+    this.slider_bg.height = 200;
+    this.slider_handle.scale = (h / 6 / 1000) * 0.8;
+    this.slider_handle.position.set(w / 1.25, h - 115 + this.paddle_input * 150);
+
     return null;
   }
   input_start(pos: { x: number; y: number }): null {
+    this.grab_slider(pos.x, pos.y);
     return null;
   }
   input_drag(pos: { x: number; y: number }, isDragging: boolean): null {
+    this.grab_slider(pos.x, pos.y);
     return null;
   }
   input_end(pos: { x: number; y: number }): null {
+    this.paddle_input = 0;
     return null;
+  }
+
+  private grab_slider(x: number, y: number) {
+    const rect = this.slider_bg.getBoundingClientRect(true);
+
+    const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
+
+    const pos = this.slider_bg.position.y;
+
+    this.paddle_input = clamp(y - pos, rect.top - pos, rect.bottom - pos) / (rect.bottom - rect.top)
   }
 }
