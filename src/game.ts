@@ -5,9 +5,11 @@ import { Scene } from "./scene";
 import { Vector } from "two.js/src/vector";
 import { Group } from "two.js/src/group";
 
-const PADDLE_SIZE_Y: number = 220;
-const PADDLE_SIZE_X: number = 35;
-const BALL_RADIUS: number = 25;
+const PADDLE_SIZE_Y: number = 450;
+const PADDLE_SIZE_X: number = 38;
+const PADDLE_SPEED: number = 3;
+const BALL_RADIUS: number = 32;
+const BALL_SPEED: number = 0.8;
 
 const BUTTON_OFF_COLOR = "#5A1A1A";
 const BUTTON_ON_COLOR = "#FF1A1A";
@@ -21,10 +23,18 @@ class World {
   private ball: ReturnType<Two["makeCircle"]>;
 
   public readonly paddle_left_posy: NetNumber;
-  private paddle_left: ReturnType<Two["makeRectangle"]>;
+  private paddle_left_top: ReturnType<Two["makeRectangle"]>;
+  private paddle_left_bottom: ReturnType<Two["makeRectangle"]>;
 
   public readonly paddle_right_posy: NetNumber;
-  private paddle_right: ReturnType<Two["makeRectangle"]>;
+  private paddle_right_top: ReturnType<Two["makeRectangle"]>;
+  private paddle_right_bottom: ReturnType<Two["makeRectangle"]>;
+
+  public left_paddle_top_enabled: boolean = false;
+  public left_paddle_bottom_enabled: boolean = false;
+
+  public right_paddle_top_enabled: boolean = false;
+  public right_paddle_bottom_enabled: boolean = false;
 
   constructor(ctx: Two) {
     this.group = ctx.makeGroup();
@@ -46,25 +56,48 @@ class World {
     // Paddle (left)
     this.paddle_left_posy = new NetNumber(0.0);
 
-    this.paddle_left = ctx.makeRectangle(
+    this.paddle_left_top = ctx.makeRectangle(
       -900.0,
       0.0,
       PADDLE_SIZE_X,
-      PADDLE_SIZE_Y,
+      PADDLE_SIZE_Y / 2,
     );
-    this.paddle_left.fill = "white";
-    this.group.add(this.paddle_left);
+    this.paddle_left_top.origin.set(0, PADDLE_SIZE_Y / 4);
+    this.paddle_left_top.fill = "white";
+    this.group.add(this.paddle_left_top);
+
+    this.paddle_left_bottom = ctx.makeRectangle(
+      -900.0,
+      0.0,
+      PADDLE_SIZE_X,
+      PADDLE_SIZE_Y / 2,
+    );
+    this.paddle_left_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
+    this.paddle_left_bottom.fill = "white";
+    this.group.add(this.paddle_left_bottom);
 
     // Paddle (right)
     this.paddle_right_posy = new NetNumber(0.0);
-    this.paddle_right = ctx.makeRectangle(
+
+    this.paddle_right_top = ctx.makeRectangle(
       900.0,
       0.0,
       PADDLE_SIZE_X,
-      PADDLE_SIZE_Y,
+      PADDLE_SIZE_Y / 2,
     );
-    this.paddle_right.fill = "salmon";
-    this.group.add(this.paddle_right);
+    this.paddle_right_top.origin.set(0, PADDLE_SIZE_Y / 4);
+    this.paddle_right_top.fill = "salmon";
+    this.group.add(this.paddle_right_top);
+
+    this.paddle_right_bottom = ctx.makeRectangle(
+      900.0,
+      0.0,
+      PADDLE_SIZE_X,
+      PADDLE_SIZE_Y / 2,
+    );
+    this.paddle_right_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
+    this.paddle_right_bottom.fill = "salmon";
+    this.group.add(this.paddle_right_bottom);
   }
 
   public tick(x: number, y: number, w: number, h: number) {
@@ -76,8 +109,51 @@ class World {
 
     this.group.position.set(x + w / 2, y + bounds.height / 2);
 
-    this.paddle_left.position.y = this.paddle_left_posy.get();
-    this.paddle_right.position.y = this.paddle_right_posy.get();
+    let posy_left = this.paddle_left_posy.get();
+    let posy_right = this.paddle_right_posy.get();
+
+    this.paddle_left_top.position.y = posy_left;
+    this.paddle_left_bottom.position.y = posy_left;
+
+    if (this.left_paddle_top_enabled) {
+      this.paddle_left_top.position.x = -900 + 60;
+      this.paddle_left_top.position.y += -20;
+      this.paddle_left_top.rotation = -Math.PI / 4;
+    } else {
+      this.paddle_left_top.position.x = -900;
+      this.paddle_left_top.rotation = 0;
+    }
+
+    if (this.left_paddle_bottom_enabled) {
+      this.paddle_left_bottom.position.x = -900 + 60;
+      this.paddle_left_bottom.position.y += 20;
+      this.paddle_left_bottom.rotation = Math.PI / 4;
+    } else {
+      this.paddle_left_bottom.position.x = -900;
+      this.paddle_left_bottom.rotation = 0;
+    }
+
+    // Right paddle
+    if (this.right_paddle_top_enabled) {
+      this.paddle_right_top.position.x = 900 - 60;
+      this.paddle_right_top.position.y += -20;
+      this.paddle_right_top.rotation = Math.PI / 4;
+    } else {
+      this.paddle_right_top.position.x = 900;
+      this.paddle_right_top.rotation = 0;
+    }
+
+    if (this.right_paddle_bottom_enabled) {
+      this.paddle_right_bottom.position.x = 900 - 60;
+      this.paddle_right_bottom.position.y += 20;
+      this.paddle_right_bottom.rotation = -Math.PI / 4;
+    } else {
+      this.paddle_right_bottom.position.x = 900;
+      this.paddle_right_bottom.rotation = 0;
+    }
+
+    this.paddle_right_top.position.y = this.paddle_right_posy.get();
+    this.paddle_right_bottom.position.y = this.paddle_right_posy.get();
     this.ball.position = this.ball_pos.get();
   }
 }
@@ -120,6 +196,7 @@ export class Game implements Scene {
     this.world = new World(ctx);
     const initial_velocity = new Vector(Math.random(), Math.random());
     initial_velocity.normalize();
+    initial_velocity.multiplyScalar(BALL_SPEED);
 
     if (this.multiplayer?.role == "client") {
       initial_velocity.multiplyScalar(0);
@@ -287,8 +364,6 @@ export class Game implements Scene {
 
     this.counter.position.set(w / 2, 16);
 
-    this.world.tick(20, 60, w - 40, h - 200);
-
     // Controls
     this.slider_bg.position.set(w / 1.25, h - 115);
     this.slider_bg.width = h / 6;
@@ -310,14 +385,34 @@ export class Game implements Scene {
     if (this.flipper_control == "top") {
       this.top_btn.fill = BUTTON_ON_COLOR;
       this.bottom_btn.fill = BUTTON_OFF_COLOR;
+
+      this.world.left_paddle_top_enabled = true;
+      this.world.left_paddle_bottom_enabled = false;
     } else if (this.flipper_control == "bottom") {
       this.bottom_btn.fill = BUTTON_ON_COLOR;
       this.top_btn.fill = BUTTON_OFF_COLOR;
+
+      this.world.left_paddle_top_enabled = false;
+      this.world.left_paddle_bottom_enabled = true;
     } else {
       this.top_btn.fill = BUTTON_OFF_COLOR;
       this.bottom_btn.fill = BUTTON_OFF_COLOR;
+
+      this.world.left_paddle_top_enabled = false;
+      this.world.left_paddle_bottom_enabled = false;
     }
 
+    // Control responses
+    let current_left_y = this.world.paddle_left_posy.get();
+    let next_left_y = current_left_y + this.paddle_input * PADDLE_SPEED * dt;
+    if (
+      next_left_y > -950 + PADDLE_SIZE_Y / 2 &&
+      next_left_y < 950 - PADDLE_SIZE_Y / 2
+    ) {
+      this.world.paddle_left_posy.update_truth(next_left_y);
+    }
+
+    this.world.tick(20, 60, w - 40, h - 200);
     return null;
   }
   input_start(pos: { x: number; y: number }): null {
@@ -343,11 +438,7 @@ export class Game implements Scene {
   private grab_slider(x: number, y: number) {
     const rect = this.slider_bg.getBoundingClientRect(true);
 
-    if (
-      x < rect.left ||
-      y < rect.top - 150 ||
-      y > rect.bottom + 150
-    ) {
+    if (x < rect.left || y < rect.top - 150 || y > rect.bottom + 150) {
       this.paddle_input = 0;
       return;
     }
@@ -357,7 +448,12 @@ export class Game implements Scene {
 
     const pos = this.slider_bg.position.y;
 
-    this.paddle_input =
+    const linear =
       clamp(y - pos, rect.top - pos, rect.bottom - pos) / rect.height;
+
+    // const eased = clamp(Math.pow(linear, 0.3), -1, 1)
+    const eased = Math.sign(linear) * Math.pow(Math.abs(linear), 0.2) * 0.6;
+
+    this.paddle_input = eased;
   }
 }
