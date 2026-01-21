@@ -14,7 +14,7 @@ class World {
   private group_bg: ReturnType<Two["makeRectangle"]>;
 
   public readonly ball_pos: NetVector;
-  public readonly ball_velocity: NetVector;
+  public readonly ball_velocity: Vector;
   private ball: ReturnType<Two["makeCircle"]>;
 
   public readonly paddle_left_posy: NetNumber;
@@ -33,8 +33,8 @@ class World {
     this.group.add(this.group_bg);
 
     // Ball
-    this.ball_pos = new NetVector(Vector.zero);
-    this.ball_velocity = new NetVector(Vector.zero);
+    this.ball_pos = new NetVector(new Vector(0, 0));
+    this.ball_velocity = new Vector(0, 0);
 
     this.ball = ctx.makeCircle(0, 0, BALL_RADIUS);
     this.ball.fill = "white";
@@ -112,7 +112,7 @@ export class Game implements Scene {
       initial_velocity.multiplyScalar(0);
     }
 
-    this.world.ball_velocity.update_truth(initial_velocity);
+    this.world.ball_velocity.set(initial_velocity.x, initial_velocity.y);
 
     if (this.multiplayer?.role == "client") {
       this.multiplayer.on_receive = (data) => {
@@ -122,7 +122,7 @@ export class Game implements Scene {
           data.ball.velocity.y,
         );
         this.world.ball_pos.update_truth(new_pos);
-        this.world.ball_velocity.update_truth(new_velocity);
+        this.world.ball_velocity.set(new_velocity.x, new_velocity.y);
       };
     }
   }
@@ -135,7 +135,7 @@ export class Game implements Scene {
     }
 
     if (is_host) {
-      const velocity = this.world.ball_velocity.get().clone();
+      const velocity = this.world.ball_velocity.clone();
 
       const new_pos = this.world.ball_pos.get().clone();
       new_pos.add(velocity.x * dt, velocity.y * dt);
@@ -167,7 +167,7 @@ export class Game implements Scene {
           velocity.sub(normal.clone().multiplyScalar(dot2));
         }
 
-        this.world.ball_velocity.update_truth(velocity);
+        this.world.ball_velocity.set(velocity.x, velocity.y);
       }
 
       // Update the client if connected
@@ -175,14 +175,14 @@ export class Game implements Scene {
         this.multiplayer.send({
           ball: {
             position: this.world.ball_pos.get(),
-            velocity: this.world.ball_velocity.get(),
+            velocity: this.world.ball_velocity.clone(),
           },
         });
       }
     } else {
-      this.world.ball_velocity.predict();
+      // this.world.ball_velocity.predict();
 
-      const velocity = this.world.ball_velocity.get().clone();
+      const velocity = this.world.ball_velocity.clone();
 
       const new_pos = this.world.ball_pos.get().clone();
       new_pos.add(velocity.x * dt, velocity.y * dt);
@@ -214,7 +214,7 @@ export class Game implements Scene {
           velocity.sub(normal.clone().multiplyScalar(dot2));
         }
 
-        this.world.ball_velocity.update(velocity);
+        this.world.ball_velocity.set(velocity.x, velocity.y);
       }
     }
 
