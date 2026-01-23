@@ -9,7 +9,7 @@ const PADDLE_SIZE_Y: number = 450;
 const PADDLE_SIZE_X: number = 38;
 const PADDLE_SPEED: number = 3;
 const BALL_RADIUS: number = 32;
-const BALL_SPEED: number = 0.8;
+const BALL_SPEED: number = 0.9;
 
 const BUTTON_OFF_COLOR = "#5A1A1A";
 const BUTTON_ON_COLOR = "#FF1A1A";
@@ -100,7 +100,7 @@ class World {
     this.group.add(this.paddle_right_bottom);
   }
 
-  public tick(x: number, y: number, w: number, h: number) {
+  public tick(x: number, y: number, w: number, h: number, dt: number) {
     let s = Math.min(w, h) / 2;
 
     this.group.scale = s / 1000.0;
@@ -115,9 +115,10 @@ class World {
     this.paddle_left_top.position.y = posy_left;
     this.paddle_left_bottom.position.y = posy_left;
 
+    // Left top
     if (this.left_paddle_top_enabled) {
-      this.paddle_left_top.position.x = -900 + 60;
-      this.paddle_left_top.position.y += -20;
+      this.paddle_left_top.position.x = -900 + 100;
+      this.paddle_left_top.position.y += -40;
       this.paddle_left_top.rotation = -Math.PI / 4;
     } else {
       this.paddle_left_top.position.x = -900;
@@ -125,18 +126,18 @@ class World {
     }
 
     if (this.left_paddle_bottom_enabled) {
-      this.paddle_left_bottom.position.x = -900 + 60;
-      this.paddle_left_bottom.position.y += 20;
+      this.paddle_left_bottom.position.x = -900 + 100;
+      this.paddle_left_bottom.position.y += 40;
       this.paddle_left_bottom.rotation = Math.PI / 4;
     } else {
       this.paddle_left_bottom.position.x = -900;
       this.paddle_left_bottom.rotation = 0;
     }
 
-    // Right paddle
+    // Left bottom
     if (this.right_paddle_top_enabled) {
-      this.paddle_right_top.position.x = 900 - 60;
-      this.paddle_right_top.position.y += -20;
+      this.paddle_right_top.position.x = 900 - 100;
+      this.paddle_right_top.position.y += -40;
       this.paddle_right_top.rotation = Math.PI / 4;
     } else {
       this.paddle_right_top.position.x = 900;
@@ -144,16 +145,122 @@ class World {
     }
 
     if (this.right_paddle_bottom_enabled) {
-      this.paddle_right_bottom.position.x = 900 - 60;
-      this.paddle_right_bottom.position.y += 20;
+      this.paddle_right_bottom.position.x = 900 - 100;
+      this.paddle_right_bottom.position.y += 40;
       this.paddle_right_bottom.rotation = -Math.PI / 4;
     } else {
       this.paddle_right_bottom.position.x = 900;
       this.paddle_right_bottom.rotation = 0;
     }
 
-    this.paddle_right_top.position.y = this.paddle_right_posy.get();
-    this.paddle_right_bottom.position.y = this.paddle_right_posy.get();
+    this.paddle_right_top.position.y = posy_right;
+    this.paddle_right_bottom.position.y = posy_right;
+
+    {
+      let velocity = this.ball_velocity.clone();
+
+      const new_pos = this.ball_pos.get().clone();
+      new_pos.add(velocity.x * dt, velocity.y * dt);
+      this.ball_pos.update_truth(new_pos);
+
+      if (velocity.length() > 0) {
+        const predicted_x =
+          new_pos.x + BALL_RADIUS * Math.sign(velocity.x) + velocity.x * dt;
+        const predicted_y =
+          new_pos.y + BALL_RADIUS * Math.sign(velocity.y) + velocity.y * dt;
+
+        // left and right walls
+        if (predicted_x < -1000 || predicted_x > 1000) {
+          const nx = predicted_x > 1000 ? -1 : 1;
+          const normal = new Vector(nx, 0);
+
+          const dot2 = velocity.dot(normal) * 2;
+
+          velocity.sub(normal.clone().multiplyScalar(dot2));
+        }
+
+        // top and bottom walls
+        if (predicted_y < -1000 || predicted_y > 1000) {
+          const ny = predicted_y > 1000 ? -1 : 1;
+          const normal = new Vector(0, ny);
+
+          const dot2 = velocity.dot(normal) * 2;
+
+          velocity.sub(normal.clone().multiplyScalar(dot2));
+        }
+
+        if (ball_rect_collision(this.paddle_left_top, predicted_x, predicted_y)) {
+          console.log("TOP LEFT");
+          let normal = new Vector(1, 0);
+
+          if (this.left_paddle_top_enabled) {
+            normal = new Vector(1, -1);
+          }
+
+          normal.normalize();
+
+          const dot2 = velocity.dot(normal) * 2;
+
+          velocity.sub(normal.clone().multiplyScalar(dot2));
+        } else if (
+          ball_rect_collision(this.paddle_left_bottom, predicted_x, predicted_y)
+        ) {
+          console.log("BOTTOM LEFT");
+          let normal = new Vector(1, 0);
+
+          if (this.left_paddle_bottom_enabled) {
+            normal = new Vector(1, 1);
+          }
+
+          normal.normalize();
+
+          const dot2 = velocity.dot(normal) * 2;
+
+          velocity.sub(normal.clone().multiplyScalar(dot2));
+        }
+
+        if (ball_rect_collision(this.paddle_right_top, predicted_x, predicted_y)) {
+          let normal = new Vector(-1, 0);
+
+          if (this.right_paddle_top_enabled) {
+            normal = new Vector(-1, -1);
+          }
+
+          normal.normalize();
+
+          const dot2 = velocity.dot(normal) * 2;
+
+          velocity.sub(normal.clone().multiplyScalar(dot2));
+        } else if (
+          ball_rect_collision(this.paddle_right_bottom, predicted_x, predicted_y)
+        ) {
+          let normal = new Vector(-1, 0);
+
+          if (this.right_paddle_bottom_enabled) {
+            normal = new Vector(-1, 1);
+          }
+
+          normal.normalize();
+
+          const dot2 = velocity.dot(normal) * 2;
+
+          velocity.sub(normal.clone().multiplyScalar(dot2));
+        }
+
+        this.ball_velocity.set(velocity.x, velocity.y);
+      }
+
+      // Update the client if connected
+      // if (this.multiplayer?.role == "server") {
+      //   this.multiplayer.send({
+      //     ball: {
+      //       position: this.world.ball_pos.get(),
+      //       velocity: this.world.ball_velocity.clone(),
+      //     },
+      //   });
+      // }
+    }
+
     this.ball.position = this.ball_pos.get();
   }
 }
@@ -275,90 +382,6 @@ export class Game implements Scene {
       is_host = false;
     }
 
-    if (is_host) {
-      const velocity = this.world.ball_velocity.clone();
-
-      const new_pos = this.world.ball_pos.get().clone();
-      new_pos.add(velocity.x * dt, velocity.y * dt);
-      this.world.ball_pos.update_truth(new_pos);
-
-      if (velocity.length() > 0) {
-        const predicted_x =
-          new_pos.x + BALL_RADIUS * Math.sign(velocity.x) + velocity.x * dt;
-        const predicted_y =
-          new_pos.y + BALL_RADIUS * Math.sign(velocity.y) + velocity.y * dt;
-
-        // left and right walls
-        if (predicted_x < -1000 || predicted_x > 1000) {
-          const nx = predicted_x > 1000 ? -1 : 1;
-          const normal = new Vector(nx, 0);
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
-        }
-
-        // top and bottom walls
-        if (predicted_y < -1000 || predicted_y > 1000) {
-          const ny = predicted_y > 1000 ? -1 : 1;
-          const normal = new Vector(0, ny);
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
-        }
-
-        this.world.ball_velocity.set(velocity.x, velocity.y);
-      }
-
-      // Update the client if connected
-      if (this.multiplayer?.role == "server") {
-        this.multiplayer.send({
-          ball: {
-            position: this.world.ball_pos.get(),
-            velocity: this.world.ball_velocity.clone(),
-          },
-        });
-      }
-    } else {
-      // this.world.ball_velocity.predict();
-
-      const velocity = this.world.ball_velocity.clone();
-
-      const new_pos = this.world.ball_pos.get().clone();
-      new_pos.add(velocity.x * dt, velocity.y * dt);
-      this.world.ball_pos.update(new_pos);
-
-      if (velocity.length() > 0) {
-        const predicted_x =
-          new_pos.x + BALL_RADIUS * Math.sign(velocity.x) + velocity.x * dt;
-        const predicted_y =
-          new_pos.y + BALL_RADIUS * Math.sign(velocity.y) + velocity.y * dt;
-
-        // left and right walls
-        if (predicted_x < -1000 || predicted_x > 1000) {
-          const nx = predicted_x > 1000 ? -1 : 1;
-          const normal = new Vector(nx, 0);
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
-        }
-
-        // top and bottom walls
-        if (predicted_y < -1000 || predicted_y > 1000) {
-          const ny = predicted_y > 1000 ? -1 : 1;
-          const normal = new Vector(0, ny);
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
-        }
-
-        this.world.ball_velocity.set(velocity.x, velocity.y);
-      }
-    }
-
     let w = ctx.width;
     let h = ctx.height;
 
@@ -412,7 +435,7 @@ export class Game implements Scene {
       this.world.paddle_left_posy.update_truth(next_left_y);
     }
 
-    this.world.tick(20, 60, w - 40, h - 200);
+    this.world.tick(20, 60, w - 40, h - 200, dt);
     return null;
   }
   input_start(pos: { x: number; y: number }): null {
@@ -456,4 +479,32 @@ export class Game implements Scene {
 
     this.paddle_input = eased;
   }
+}
+
+function ball_rect_collision(
+  rect: ReturnType<Two["makeRectangle"]>,
+  tx: number,
+  ty: number,
+) {
+  const dx = tx - rect.position.x;
+  const dy = ty - rect.position.y;
+
+  const cos = Math.cos(-rect.rotation);
+  const sin = Math.sin(-rect.rotation);
+
+  const unrotatedX = dx * cos - dy * sin;
+  const unrotatedY = dx * sin + dy * cos;
+
+  const localX = unrotatedX + rect.origin.x;
+  const localY = unrotatedY + rect.origin.y;
+
+  const halfW = rect.width / 2;
+  const halfH = rect.height / 2;
+
+  return (
+    localX >= -halfW &&
+    localX <=  halfW &&
+    localY >= -halfH &&
+    localY <=  halfH
+  );
 }
