@@ -6,6 +6,7 @@ import { Vector } from "two.js/src/vector";
 import { Group } from "two.js/src/group";
 import { EndScene } from "./end";
 import { CTX_RESET } from "./main";
+import { PIDController } from "./ai";
 
 const SCORE_VICTORY = 200;
 const SCORE_GOAL = 25;
@@ -19,7 +20,7 @@ const PADDLE_SPEED: number = 3;
 const BALL_RADIUS: number = 32;
 const BALL_SPEED: number = 0.9;
 const BALL_MAX_SPEED: number = BALL_SPEED * 2.5;
-const BALL_SLOWDOWN = 0.002;
+const BALL_SLOWDOWN = 0.001;
 
 const BUTTON_OFF_COLOR = "#5A1A1A";
 const BUTTON_ON_COLOR = "#FF1A1A";
@@ -204,11 +205,9 @@ class World {
     }
 
     if (this.ball_last_touch == undefined) {
-      console.log("neutral")
       this.bouncer1.fill = NEUTRAL_GRADIENT;
       this.bouncer2.fill = NEUTRAL_GRADIENT;
     } else {
-      console.log("non neutral")
       let grad =
         this.player_side == this.ball_last_touch ? GOOD_GRADIENT : BAD_GRADIENT;
       this.bouncer1.fill = grad;
@@ -437,6 +436,7 @@ class World {
 
 export class Game implements Scene {
   private multiplayer?: MultiplayerSession;
+  private ai = new PIDController();
 
   private world: World;
 
@@ -690,7 +690,7 @@ export class Game implements Scene {
 
     // Control responses
     // Determine which paddle to control based on multiplayer role
-    const isClient = this.multiplayer?.role == "client";
+    const isClient = this.multiplayer?.role == "client" || false;
     const paddle_posy = isClient
       ? this.world.paddle_right_posy
       : this.world.paddle_left_posy;
@@ -701,13 +701,27 @@ export class Game implements Scene {
     let current_y = paddle_posy.get();
     let next_y = current_y + this.paddle_input * PADDLE_SPEED * dt;
     if (next_y > -950 + PADDLE_SIZE_Y / 2 && next_y < 950 - PADDLE_SIZE_Y / 2) {
+      console.log("PLAYER   " + next_y);
       paddle_posy.update_truth(next_y);
     }
 
-    if (this.multiplayer != undefined) {
+    if (this.multiplayer) {
       other_paddle_posy.predict();
     } else {
-      other_paddle_posy.update_truth(this.world.ball_pos.get().y / 1000);
+      this.ai.setTarget(this.world.ball_pos.get().y, this.world.ball_velocity.x > 0);
+      const aiOut = this.ai.predict(dt); // returns the predicted Y position
+      const clamp = (num: number, min: number, max: number) =>
+        Math.min(Math.max(num, min), max);
+
+      const minY = -950 + PADDLE_SIZE_Y / 2;
+      const maxY = 950 - PADDLE_SIZE_Y / 2;
+
+      // aiOut is in [-1, 1]; map it into the paddle's Y range
+      const normalizedAI = clamp(aiOut + Math.sin(frameCount * 0.07) * 0.03 + Math.sin(frameCount * 0.05) * 0.04, -1, 1);
+      const aiY = minY + ((normalizedAI + 1) * 0.5) * (maxY - minY);
+
+      console.log("AI   " + aiY);
+      this.world.paddle_right_posy.update_truth(aiY);
     }
 
     this.world.tick(20, 60, w - 40, h - 200, dt);
