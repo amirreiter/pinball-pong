@@ -5,6 +5,9 @@ import { MenuScene } from "./menu";
 
 import { SFXManager } from "./sound";
 
+// @ts-ignore
+const BASE = import.meta.env.BASE_URL;
+
 declare global {
   interface Window {
     current_scene: Scene;
@@ -16,9 +19,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   await document.fonts.load("32px 'Press Start 2P'");
 
   window.sfx = new SFXManager();
-  await window.sfx.load("good", "/sfx/good.ogg");
-  await window.sfx.load("bad", "/sfx/bad.ogg");
-  await window.sfx.load("neutral", "/sfx/neutral.ogg");
+  await window.sfx.load("good", `${BASE}sfx/good.ogg`);
+  await window.sfx.load("bad", `${BASE}sfx/bad.ogg`);
+  await window.sfx.load("neutral", `${BASE}sfx/neutral.ogg`);
 
   const GAME_CONTAINER = document.getElementById("game")!;
 

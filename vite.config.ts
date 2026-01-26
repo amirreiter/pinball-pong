@@ -1,22 +1,24 @@
 import { defineConfig } from "vite";
-import basicSsl from '@vitejs/plugin-basic-ssl';
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
-export default defineConfig({
-  plugins: [
-    basicSsl()
-  ],
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    sourcemap: false,
-    minify: "esbuild",
-    cssCodeSplit: false,
-    rollupOptions: {
-      output: {
-        entryFileNames: "game.js",
-        chunkFileNames: "game.js",
-        assetFileNames: "[name][extname]",
+export default defineConfig(({ command }) => {
+  return {
+    base: command === "build" ? "/pinball-pong/" : "/",
+    build: {
+      outDir: "docs",
+      emptyOutDir: true,
+      sourcemap: false,
+      minify: "terser",
+      target: "es2015",
+      rollupOptions: {
+        output: {
+          entryFileNames: "game.js",
+          format: "umd",
+          name: "Game",
+          inlineDynamicImports: true,
+        },
       },
     },
-  },
+    plugins: [basicSsl()],
+  };
 });
