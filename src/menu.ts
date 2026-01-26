@@ -7,6 +7,7 @@ import { encode as b64encode, decode as b64decode } from "uint8-base64";
 import { Scene } from "./scene";
 import { Game } from "./game";
 import { MultiplayerSession } from "./multiplayer";
+import { CTX_RESET } from "./main";
 
 function generate_invite(sdp: string): string {
   const encoder = new TextEncoder();
@@ -49,6 +50,8 @@ export class MenuScene implements Scene {
   private multiplayer_channel: RTCDataChannel | null;
 
   constructor(ctx: Two) {
+    CTX_RESET(ctx);
+
     this.multiplayer_pc = null;
     this.next_scene = null;
     this.multiplayer_channel = null;
@@ -195,7 +198,14 @@ export class MenuScene implements Scene {
         }
 
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+          iceServers: [
+            {
+              urls: [
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302",
+              ],
+            },
+          ],
         });
 
         let data_channel = pc.createDataChannel("pong");
@@ -310,7 +320,14 @@ export class MenuScene implements Scene {
 
         // Set up WebRTC
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+          iceServers: [
+            {
+              urls: [
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302",
+              ],
+            },
+          ],
         });
         pc.ondatachannel = (event) => {
           const data_channel = event.channel;

@@ -3,14 +3,22 @@ import Two from "two.js";
 import { Scene } from "./scene";
 import { MenuScene } from "./menu";
 
+import { SFXManager } from "./sound";
+
 declare global {
   interface Window {
     current_scene: Scene;
+    sfx: SFXManager;
   }
 }
 
 document.addEventListener("DOMContentLoaded", async function () {
   await document.fonts.load("32px 'Press Start 2P'");
+
+  window.sfx = new SFXManager();
+  await window.sfx.load("good", "/sfx/good.ogg");
+  await window.sfx.load("bad", "/sfx/bad.ogg");
+  await window.sfx.load("neutral", "/sfx/neutral.ogg");
 
   const GAME_CONTAINER = document.getElementById("game")!;
 
@@ -28,8 +36,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     const maybe_scene = window.current_scene.tick(TWO, frameCount, dt);
 
     if (maybe_scene !== null) {
-      console.log("Switching Scene");
       window.current_scene = maybe_scene;
+      window.current_scene.tick(TWO, frameCount, dt);
     }
   });
 
@@ -43,7 +51,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   let isDragging = false;
 
-  const handleDown = (e: MouseEvent | TouchEvent) => {
+  const handleDown = async (e: MouseEvent | TouchEvent) => {
+    await window.sfx.unlock();
     e.preventDefault();
     const pos = getEventPosition(e);
     isDragging = true;
@@ -74,3 +83,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   window.addEventListener("touchend", handleUp, { passive: false });
   window.addEventListener("touchcancel", handleUp, { passive: false });
 });
+
+export function CTX_RESET(ctx: Two) {
+  ctx.clear();
+  ctx.scene.scale = 1;
+  ctx.scene.translation.set(0, 0);
+}

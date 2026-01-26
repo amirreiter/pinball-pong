@@ -146,4 +146,9 @@ export class MultiplayerSession {
     // @ts-ignore
     this.channel.send(compressed);
   }
+
+  public disconnect() {
+    this.channel.close();
+    this.pc.close();
+  }
 }

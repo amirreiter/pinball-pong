@@ -4,6 +4,13 @@ import { MultiplayerSession, NetVector, NetNumber } from "./multiplayer";
 import { Scene } from "./scene";
 import { Vector } from "two.js/src/vector";
 import { Group } from "two.js/src/group";
+import { EndScene } from "./end";
+import { CTX_RESET } from "./main";
+
+const SCORE_VICTORY = 200;
+const SCORE_GOAL = 25;
+const SCORE_BOUNCER = 5;
+const BALL_RESPAWN_IDLE_TIME = 2;
 
 const PADDLE_SIZE_Y: number = 450;
 const PADDLE_SIZE_X: number = 38;
@@ -21,16 +28,21 @@ const BOUNCER_RADIUS = 200;
 const BOUNCER_SPLIT = 500;
 const BOUNCE_SPEEDUP = 2;
 
+let NEUTRAL_GRADIENT: any = undefined;
+let GOOD_GRADIENT: any = undefined;
+let BAD_GRADIENT: any = undefined;
+
 class World {
   private player_side: "left" | "right";
-  private score_left = 0;
-  private score_right = 0;
+  public score_left = 0;
+  public score_right = 0;
+  private ball_last_touch?: "left" | "right" = undefined;
 
   private group: Group;
   private group_bg: ReturnType<Two["makeRectangle"]>;
 
-  public readonly ball_pos: NetVector;
-  public readonly ball_velocity: Vector;
+  public ball_pos: NetVector;
+  public ball_velocity: Vector;
   private ball: ReturnType<Two["makeCircle"]>;
 
   public readonly paddle_left_posy: NetNumber;
@@ -52,6 +64,42 @@ class World {
 
   constructor(ctx: Two, player_side: "left" | "right") {
     this.player_side = player_side;
+
+    NEUTRAL_GRADIENT = ctx.makeRadialGradient(
+      0.5,
+      0.5,
+      0.5,
+      new Two.Stop(0, "#CFCFCF"),
+      new Two.Stop(0.4, "#BFBFBF"),
+      new Two.Stop(0.88, "#9F9F9F"),
+      new Two.Stop(0.93, "#000000"),
+      new Two.Stop(0.98, "white"),
+      new Two.Stop(1, "white"),
+    );
+
+    GOOD_GRADIENT = ctx.makeRadialGradient(
+      0.5,
+      0.5,
+      0.5,
+      new Two.Stop(0, "#CFCFCF"),
+      new Two.Stop(0.4, "#BFBFBF"),
+      new Two.Stop(0.88, "#9F9F9F"),
+      new Two.Stop(0.93, "#000000"),
+      new Two.Stop(0.98, "palegreen"),
+      new Two.Stop(1, "palegreen"),
+    );
+
+    BAD_GRADIENT = ctx.makeRadialGradient(
+      0.5,
+      0.5,
+      0.5,
+      new Two.Stop(0, "#CFCFCF"),
+      new Two.Stop(0.4, "#BFBFBF"),
+      new Two.Stop(0.88, "#9F9F9F"),
+      new Two.Stop(0.93, "#000000"),
+      new Two.Stop(0.98, "salmon"),
+      new Two.Stop(1, "salmon"),
+    );
 
     this.group = ctx.makeGroup();
     this.group_bg = ctx.makeRectangle(0, 0, 2000, 2000);
@@ -79,7 +127,7 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_left_top.origin.set(0, PADDLE_SIZE_Y / 4);
-    this.paddle_left_top.fill = player_side == "left" ? "white" : "salmon";
+    this.paddle_left_top.fill = player_side == "left" ? "palegreen" : "salmon";
     this.group.add(this.paddle_left_top);
 
     this.paddle_left_bottom = ctx.makeRectangle(
@@ -89,7 +137,8 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_left_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
-    this.paddle_left_bottom.fill = player_side == "left" ? "white" : "salmon";
+    this.paddle_left_bottom.fill =
+      player_side == "left" ? "palegreen" : "salmon";
     this.group.add(this.paddle_left_bottom);
 
     // Paddle (right)
@@ -116,31 +165,11 @@ class World {
     this.group.add(this.paddle_right_bottom);
 
     this.bouncer1 = ctx.makeCircle(0, BOUNCER_SPLIT, BOUNCER_RADIUS);
-    this.bouncer1.fill = ctx.makeRadialGradient(
-      0.5,
-      0.5,
-      0.5,
-      new Two.Stop(0, "#CFCFCF"),
-      new Two.Stop(0.4, "#BFBFBF"),
-      new Two.Stop(0.88, "#9F9F9F"),
-      new Two.Stop(0.93, "#000000"),
-      new Two.Stop(0.98, "#CF5F5F"),
-      new Two.Stop(1, "#CF5F5F"),
-    );
+    this.bouncer1.fill = "pink";
     this.group.add(this.bouncer1);
 
     this.bouncer2 = ctx.makeCircle(0, -BOUNCER_SPLIT, BOUNCER_RADIUS);
-    this.bouncer2.fill = ctx.makeRadialGradient(
-      0.5,
-      0.5,
-      0.5,
-      new Two.Stop(0, "#CFCFCF"),
-      new Two.Stop(0.4, "#BFBFBF"),
-      new Two.Stop(0.88, "#9F9F9F"),
-      new Two.Stop(0.93, "#000000"),
-      new Two.Stop(0.98, "#CF5F5F"),
-      new Two.Stop(1, "#CF5F5F"),
-    );
+    this.bouncer2.fill = "pink";
     this.group.add(this.bouncer2);
   }
 
@@ -172,6 +201,18 @@ class World {
 
     if (this.ball_velocity.length() > BALL_MAX_SPEED) {
       this.ball_velocity.setLength(BALL_MAX_SPEED);
+    }
+
+    if (this.ball_last_touch == undefined) {
+      console.log("neutral")
+      this.bouncer1.fill = NEUTRAL_GRADIENT;
+      this.bouncer2.fill = NEUTRAL_GRADIENT;
+    } else {
+      console.log("non neutral")
+      let grad =
+        this.player_side == this.ball_last_touch ? GOOD_GRADIENT : BAD_GRADIENT;
+      this.bouncer1.fill = grad;
+      this.bouncer2.fill = grad;
     }
 
     let posy_left = this.paddle_left_posy.get();
@@ -235,17 +276,65 @@ class World {
           new_pos.y + BALL_RADIUS * Math.sign(velocity.y) + velocity.y * dt;
 
         // left and right walls
-        if (predicted_x < -1000 || predicted_x > 1000) {
-          const nx = predicted_x > 1000 ? -1 : 1;
-          const normal = new Vector(nx, 0);
+        let hit: "left" | "right" | null = null;
+        if (predicted_x < -1000) {
+          this.score_right += SCORE_GOAL;
 
-          const dot2 = velocity.dot(normal) * 2;
+          if (this.player_side == "left") {
+            window.sfx.play("bad");
+          } else {
+            window.sfx.play("good");
+          }
 
-          velocity.sub(normal.clone().multiplyScalar(dot2));
+          hit = "left";
+        } else if (predicted_x > 1000) {
+          this.score_left += SCORE_GOAL;
+
+          if (this.player_side == "right") {
+            window.sfx.play("bad");
+          } else {
+            window.sfx.play("good");
+          }
+
+          hit = "right";
+        }
+
+        if (hit != null) {
+          // Twice to remove all prediction
+          this.ball_pos.update_truth(new Vector(0, 0));
+          this.ball_pos.update_truth(new Vector(0, 0));
+
+          this.ball_velocity = new Vector(0, 0);
+
+          this.ball.position = this.ball_pos.get();
+
+          this.ball_last_touch = undefined;
+
+          // Wait 2 seconds before resetting the ball if we're the server
+          if (this.player_side == "left") {
+            setTimeout(() => {
+              // send ball towards the player who scored
+              const direction = hit == "right" ? -1 : 1; // Left scored on -> ball goes right, right scored on -> ball goes left
+
+              const angle = (Math.random() * 120 - 60) * (Math.PI / 180);
+
+              const reset_velocity = new Vector(
+                direction * Math.cos(angle),
+                Math.sin(angle),
+              );
+              reset_velocity.normalize();
+              reset_velocity.multiplyScalar(BALL_SPEED);
+              this.ball_velocity.set(reset_velocity.x, reset_velocity.y);
+            }, 1000 * BALL_RESPAWN_IDLE_TIME);
+          }
+
+          return;
         }
 
         // top and bottom walls
         if (predicted_y < -1000 || predicted_y > 1000) {
+          window.sfx.play("neutral");
+
           const ny = predicted_y > 1000 ? -1 : 1;
           const normal = new Vector(0, ny);
 
@@ -264,6 +353,15 @@ class World {
             if (dot < 0) {
               const dot2 = dot * 2;
               velocity.sub(normal.clone().multiplyScalar(dot2));
+
+              if (this.ball.position.x < 0) {
+                this.ball_last_touch = "left";
+              } else {
+                this.ball_last_touch = "right";
+              }
+
+              window.sfx.play("neutral");
+
               return true;
             }
           }
@@ -290,6 +388,26 @@ class World {
         );
 
         const old_length = velocity.length();
+
+        if (bounce1 || bounce2) {
+          if (this.ball_last_touch == "left") {
+            this.score_left += SCORE_BOUNCER;
+            if (this.player_side == "left") {
+              window.sfx.play("good");
+            } else {
+              window.sfx.play("neutral", 1.0);
+              window.sfx.play("bad", 0.1);
+            }
+          } else if (this.ball_last_touch == "right") {
+            this.score_right += SCORE_BOUNCER;
+            if (this.player_side == "right") {
+              window.sfx.play("good");
+            } else {
+              window.sfx.play("neutral", 1.0);
+              window.sfx.play("bad", 0.1);
+            }
+          }
+        }
 
         if (bounce1 != null) {
           const dot = velocity.dot(bounce1);
@@ -319,12 +437,10 @@ class World {
 
 export class Game implements Scene {
   private multiplayer?: MultiplayerSession;
-  private score_server?: number;
-  private score_client?: number;
 
   private world: World;
 
-  private counter: ReturnType<Two["makeText"]>;
+  private score_counter: ReturnType<Two["makeText"]>;
 
   private slider_bg: ReturnType<Two["makeRoundedRectangle"]>;
   private slider_track: ReturnType<Two["makeRoundedRectangle"]>;
@@ -342,12 +458,10 @@ export class Game implements Scene {
     is_host: boolean,
   ) {
     // Clean reset
-    ctx.clear();
-    ctx.scene.scale = 1;
-    ctx.scene.translation.set(0, 0);
+    CTX_RESET(ctx);
 
     this.multiplayer = multiplayer;
-    this.counter = ctx.makeText("FRAME NUMBER", 0, 0, {
+    this.score_counter = ctx.makeText("FRAME NUMBER", 0, 0, {
       size: 16,
       family: "'Press Start 2P'",
       alignment: "center",
@@ -356,17 +470,21 @@ export class Game implements Scene {
 
     this.world = new World(
       ctx,
-      multiplayer?.role == "client" ? "right" : "left",
+      !multiplayer || multiplayer.role !== "client" ? "left" : "right",
     );
-    const initial_velocity = new Vector(Math.random(), Math.random());
-    initial_velocity.normalize();
-    initial_velocity.multiplyScalar(BALL_SPEED);
 
-    if (this.multiplayer?.role == "client") {
-      initial_velocity.multiplyScalar(0);
+    if (!this.multiplayer || this.multiplayer?.role != "client") {
+      setTimeout(() => {
+        const initial_velocity = new Vector(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+        );
+        initial_velocity.normalize();
+        initial_velocity.multiplyScalar(BALL_SPEED);
+
+        this.world.ball_velocity.set(initial_velocity.x, initial_velocity.y);
+      }, BALL_RESPAWN_IDLE_TIME * 1000);
     }
-
-    this.world.ball_velocity.set(initial_velocity.x, initial_velocity.y);
 
     if (this.multiplayer?.role == "client") {
       this.multiplayer.on_receive = (data) => {
@@ -377,8 +495,8 @@ export class Game implements Scene {
         );
         this.world.ball_pos.update_truth(new_pos);
         this.world.ball_velocity.set(new_velocity.x, new_velocity.y);
-        this.score_server = data.score_server;
-        this.score_client = data.score_client;
+        this.world.score_left = data.score_server | 0;
+        this.world.score_right = data.score_client | 0;
         this.world.paddle_left_posy.update_truth(data.paddle_server);
 
         this.world.left_flip_top = data.server_flip_top;
@@ -453,8 +571,8 @@ export class Game implements Scene {
           velocity: this.world.ball_velocity.clone(),
         },
 
-        score_server: this.score_server,
-        score_client: this.score_server,
+        score_server: this.world.score_left,
+        score_client: this.world.score_right,
 
         paddle_server: this.world.paddle_left_posy.get(),
         paddle_client: this.world.paddle_right_posy.get(),
@@ -471,10 +589,51 @@ export class Game implements Scene {
       });
     }
 
+    if (
+      this.world.score_left >= SCORE_VICTORY ||
+      this.world.score_right >= SCORE_VICTORY
+    ) {
+      let won = false;
+      let score =
+        this.world.score_left.toString() +
+        ":" +
+        this.world.score_right.toString();
+
+      if (this.multiplayer) {
+        this.multiplayer.disconnect();
+
+        if (
+          this.world.score_left > this.world.score_right &&
+          this.multiplayer.role == "server"
+        ) {
+          won = true;
+        }
+
+        if (
+          this.world.score_left < this.world.score_right &&
+          this.multiplayer.role == "client"
+        ) {
+          won = true;
+        }
+      } else {
+        if (this.world.score_left > this.world.score_right) {
+          won = true;
+        }
+      }
+
+      return new EndScene(ctx, won, score);
+    }
+
     let w = ctx.width;
     let h = ctx.height;
 
-    this.counter.position.set(w / 2, 16);
+    const lpad = (s: string, n: number, c = "0") => String(s).padStart(n, c);
+
+    this.score_counter.position.set(w / 2, 16);
+    this.score_counter.value =
+      lpad(this.world.score_left.toString(), 3) +
+      " ——— " +
+      lpad(this.world.score_right.toString(), 3);
 
     // Controls
     this.slider_bg.position.set(w / 1.25, h - 115);
