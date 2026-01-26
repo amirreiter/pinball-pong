@@ -22,6 +22,10 @@ const BOUNCER_SPLIT = 500;
 const BOUNCE_SPEEDUP = 2;
 
 class World {
+  private player_side: "left" | "right";
+  private score_left = 0;
+  private score_right = 0;
+
   private group: Group;
   private group_bg: ReturnType<Two["makeRectangle"]>;
 
@@ -37,16 +41,18 @@ class World {
   private paddle_right_top: ReturnType<Two["makeRectangle"]>;
   private paddle_right_bottom: ReturnType<Two["makeRectangle"]>;
 
-  public left_paddle_top_enabled: boolean = false;
-  public left_paddle_bottom_enabled: boolean = false;
+  public left_flip_top: boolean = false;
+  public left_flip_bottom: boolean = false;
 
-  public right_paddle_top_enabled: boolean = false;
-  public right_paddle_bottom_enabled: boolean = false;
+  public right_flip_top: boolean = false;
+  public right_flip_bottom: boolean = false;
 
   private bouncer1: ReturnType<Two["makeCircle"]>;
   private bouncer2: ReturnType<Two["makeCircle"]>;
 
-  constructor(ctx: Two) {
+  constructor(ctx: Two, player_side: "left" | "right") {
+    this.player_side = player_side;
+
     this.group = ctx.makeGroup();
     this.group_bg = ctx.makeRectangle(0, 0, 2000, 2000);
     this.group_bg.fill = "#101010";
@@ -73,7 +79,7 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_left_top.origin.set(0, PADDLE_SIZE_Y / 4);
-    this.paddle_left_top.fill = "white";
+    this.paddle_left_top.fill = player_side == "left" ? "white" : "salmon";
     this.group.add(this.paddle_left_top);
 
     this.paddle_left_bottom = ctx.makeRectangle(
@@ -83,7 +89,7 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_left_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
-    this.paddle_left_bottom.fill = "white";
+    this.paddle_left_bottom.fill = player_side == "left" ? "white" : "salmon";
     this.group.add(this.paddle_left_bottom);
 
     // Paddle (right)
@@ -96,7 +102,7 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_right_top.origin.set(0, PADDLE_SIZE_Y / 4);
-    this.paddle_right_top.fill = "salmon";
+    this.paddle_right_top.fill = player_side == "right" ? "white" : "salmon";
     this.group.add(this.paddle_right_top);
 
     this.paddle_right_bottom = ctx.makeRectangle(
@@ -106,11 +112,14 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_right_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
-    this.paddle_right_bottom.fill = "salmon";
+    this.paddle_right_bottom.fill = player_side == "right" ? "white" : "salmon";
     this.group.add(this.paddle_right_bottom);
 
     this.bouncer1 = ctx.makeCircle(0, BOUNCER_SPLIT, BOUNCER_RADIUS);
-    this.bouncer1.fill = ctx.makeRadialGradient(0.5, 0.5, 0.5,
+    this.bouncer1.fill = ctx.makeRadialGradient(
+      0.5,
+      0.5,
+      0.5,
       new Two.Stop(0, "#CFCFCF"),
       new Two.Stop(0.4, "#BFBFBF"),
       new Two.Stop(0.88, "#9F9F9F"),
@@ -121,7 +130,10 @@ class World {
     this.group.add(this.bouncer1);
 
     this.bouncer2 = ctx.makeCircle(0, -BOUNCER_SPLIT, BOUNCER_RADIUS);
-    this.bouncer2.fill = ctx.makeRadialGradient(0.5, 0.5, 0.5,
+    this.bouncer2.fill = ctx.makeRadialGradient(
+      0.5,
+      0.5,
+      0.5,
       new Two.Stop(0, "#CFCFCF"),
       new Two.Stop(0.4, "#BFBFBF"),
       new Two.Stop(0.88, "#9F9F9F"),
@@ -135,12 +147,18 @@ class World {
   public tick(x: number, y: number, w: number, h: number, dt: number) {
     let s = Math.min(w, h) / 2;
     this.group.scale = s / 1000.0;
-    this.group.position.set(x + w / 2, y + this.group.getBoundingClientRect().height / 2);
+    this.group.position.set(
+      x + w / 2,
+      y + this.group.getBoundingClientRect().height / 2,
+    );
 
     // slow down the ball
     const current_speed = this.ball_velocity.length();
     if (current_speed > BALL_SPEED) {
-      const slowdown_vector = this.ball_velocity.clone().normalize().multiplyScalar(BALL_SLOWDOWN * dt);
+      const slowdown_vector = this.ball_velocity
+        .clone()
+        .normalize()
+        .multiplyScalar(BALL_SLOWDOWN * dt);
       if (slowdown_vector.length() < this.ball_velocity.length()) {
         this.ball_velocity.sub(slowdown_vector);
       } else {
@@ -148,15 +166,13 @@ class World {
       }
 
       if (this.ball_velocity.length() < BALL_SPEED + 0.01) {
-           this.ball_velocity.normalize().multiplyScalar(BALL_SPEED);
+        this.ball_velocity.normalize().multiplyScalar(BALL_SPEED);
       }
     }
 
     if (this.ball_velocity.length() > BALL_MAX_SPEED) {
-      this.ball_velocity.setLength(BALL_MAX_SPEED)
+      this.ball_velocity.setLength(BALL_MAX_SPEED);
     }
-
-    console.log(dt)
 
     let posy_left = this.paddle_left_posy.get();
     let posy_right = this.paddle_right_posy.get();
@@ -165,7 +181,7 @@ class World {
     this.paddle_left_bottom.position.y = posy_left;
 
     // Left top
-    if (this.left_paddle_top_enabled) {
+    if (this.left_flip_top) {
       this.paddle_left_top.position.x = -900 + 100;
       this.paddle_left_top.position.y += -40;
       this.paddle_left_top.rotation = -Math.PI / 4;
@@ -174,7 +190,7 @@ class World {
       this.paddle_left_top.rotation = 0;
     }
 
-    if (this.left_paddle_bottom_enabled) {
+    if (this.left_flip_bottom) {
       this.paddle_left_bottom.position.x = -900 + 100;
       this.paddle_left_bottom.position.y += 40;
       this.paddle_left_bottom.rotation = Math.PI / 4;
@@ -184,7 +200,7 @@ class World {
     }
 
     // Left bottom
-    if (this.right_paddle_top_enabled) {
+    if (this.right_flip_top) {
       this.paddle_right_top.position.x = 900 - 100;
       this.paddle_right_top.position.y += -40;
       this.paddle_right_top.rotation = Math.PI / 4;
@@ -193,7 +209,7 @@ class World {
       this.paddle_right_top.rotation = 0;
     }
 
-    if (this.right_paddle_bottom_enabled) {
+    if (this.right_flip_bottom) {
       this.paddle_right_bottom.position.x = 900 - 100;
       this.paddle_right_bottom.position.y += 40;
       this.paddle_right_bottom.rotation = -Math.PI / 4;
@@ -262,21 +278,31 @@ class World {
           processBounce(this.paddle_right_bottom);
         }
 
-        const bounce1 = ball_circle_collision(this.bouncer1, new_pos.x, new_pos.y);
-        const bounce2 = ball_circle_collision(this.bouncer2, new_pos.x, new_pos.y);
+        const bounce1 = ball_circle_collision(
+          this.bouncer1,
+          new_pos.x,
+          new_pos.y,
+        );
+        const bounce2 = ball_circle_collision(
+          this.bouncer2,
+          new_pos.x,
+          new_pos.y,
+        );
 
-        const old_length = velocity.length()
+        const old_length = velocity.length();
 
         if (bounce1 != null) {
           const dot = velocity.dot(bounce1);
-          if (dot < 0) { // Only bounce if moving toward the surface
+          if (dot < 0) {
+            // Only bounce if moving toward the surface
             const dot2 = dot * 2;
             velocity.sub(bounce1.clone().multiplyScalar(dot2));
             velocity.normalize().multiplyScalar(BOUNCE_SPEEDUP * old_length);
           }
         } else if (bounce2 != null) {
           const dot = velocity.dot(bounce2);
-          if (dot < 0) { // Only bounce if moving toward the surface
+          if (dot < 0) {
+            // Only bounce if moving toward the surface
             const dot2 = dot * 2;
             velocity.sub(bounce2.clone().multiplyScalar(dot2));
             velocity.normalize().multiplyScalar(BOUNCE_SPEEDUP * old_length);
@@ -285,16 +311,6 @@ class World {
 
         this.ball_velocity.set(velocity.x, velocity.y);
       }
-
-      // Update the client if connected
-      // if (this.multiplayer?.role == "server") {
-      //   this.multiplayer.send({
-      //     ball: {
-      //       position: this.world.ball_pos.get(),
-      //       velocity: this.world.ball_velocity.clone(),
-      //     },
-      //   });
-      // }
     }
 
     this.ball.position = this.ball_pos.get();
@@ -302,7 +318,9 @@ class World {
 }
 
 export class Game implements Scene {
-  private multiplayer: MultiplayerSession | undefined;
+  private multiplayer?: MultiplayerSession;
+  private score_server?: number;
+  private score_client?: number;
 
   private world: World;
 
@@ -336,7 +354,10 @@ export class Game implements Scene {
       fill: "white",
     });
 
-    this.world = new World(ctx);
+    this.world = new World(
+      ctx,
+      multiplayer?.role == "client" ? "right" : "left",
+    );
     const initial_velocity = new Vector(Math.random(), Math.random());
     initial_velocity.normalize();
     initial_velocity.multiplyScalar(BALL_SPEED);
@@ -356,6 +377,18 @@ export class Game implements Scene {
         );
         this.world.ball_pos.update_truth(new_pos);
         this.world.ball_velocity.set(new_velocity.x, new_velocity.y);
+        this.score_server = data.score_server;
+        this.score_client = data.score_client;
+        this.world.paddle_left_posy.update_truth(data.paddle_server);
+
+        this.world.left_flip_top = data.server_flip_top;
+        this.world.left_flip_bottom = data.server_flip_bottom;
+      };
+    } else if (this.multiplayer?.role == "server") {
+      this.multiplayer.on_receive = (data) => {
+        this.world.paddle_right_posy.update_truth(data.paddle_client);
+        this.world.right_flip_top = data.client_flip_top;
+        this.world.right_flip_bottom = data.client_flip_bottom;
       };
     }
 
@@ -412,10 +445,30 @@ export class Game implements Scene {
   }
 
   tick(ctx: Two, frameCount: number, dt: number): Scene | null {
-    let is_host: boolean = true;
+    // Update the client if connected
+    if (this.multiplayer?.role == "server") {
+      this.multiplayer.send({
+        ball: {
+          position: this.world.ball_pos.get(),
+          velocity: this.world.ball_velocity.clone(),
+        },
 
-    if (this.multiplayer?.role == "client") {
-      is_host = false;
+        score_server: this.score_server,
+        score_client: this.score_server,
+
+        paddle_server: this.world.paddle_left_posy.get(),
+        paddle_client: this.world.paddle_right_posy.get(),
+
+        server_flip_top: this.world.left_flip_top,
+        server_flip_bottom: this.world.left_flip_bottom,
+      });
+    } else if (this.multiplayer?.role == "client") {
+      this.multiplayer.send({
+        paddle_client: this.world.paddle_right_posy.get(),
+
+        client_flip_top: this.world.right_flip_top,
+        client_flip_bottom: this.world.right_flip_bottom,
+      });
     }
 
     let w = ctx.width;
@@ -445,30 +498,57 @@ export class Game implements Scene {
       this.top_btn.fill = BUTTON_ON_COLOR;
       this.bottom_btn.fill = BUTTON_OFF_COLOR;
 
-      this.world.left_paddle_top_enabled = true;
-      this.world.left_paddle_bottom_enabled = false;
+      if (this.multiplayer?.role == "client") {
+        this.world.right_flip_top = true;
+        this.world.right_flip_bottom = false;
+      } else {
+        this.world.left_flip_top = true;
+        this.world.left_flip_bottom = false;
+      }
     } else if (this.flipper_control == "bottom") {
       this.bottom_btn.fill = BUTTON_ON_COLOR;
       this.top_btn.fill = BUTTON_OFF_COLOR;
 
-      this.world.left_paddle_top_enabled = false;
-      this.world.left_paddle_bottom_enabled = true;
+      if (this.multiplayer?.role == "client") {
+        this.world.right_flip_top = false;
+        this.world.right_flip_bottom = true;
+      } else {
+        this.world.left_flip_top = false;
+        this.world.left_flip_bottom = true;
+      }
     } else {
       this.top_btn.fill = BUTTON_OFF_COLOR;
       this.bottom_btn.fill = BUTTON_OFF_COLOR;
 
-      this.world.left_paddle_top_enabled = false;
-      this.world.left_paddle_bottom_enabled = false;
+      if (this.multiplayer?.role == "client") {
+        this.world.right_flip_top = false;
+        this.world.right_flip_bottom = false;
+      } else {
+        this.world.left_flip_top = false;
+        this.world.left_flip_bottom = false;
+      }
     }
 
     // Control responses
-    let current_left_y = this.world.paddle_left_posy.get();
-    let next_left_y = current_left_y + this.paddle_input * PADDLE_SPEED * dt;
-    if (
-      next_left_y > -950 + PADDLE_SIZE_Y / 2 &&
-      next_left_y < 950 - PADDLE_SIZE_Y / 2
-    ) {
-      this.world.paddle_left_posy.update_truth(next_left_y);
+    // Determine which paddle to control based on multiplayer role
+    const isClient = this.multiplayer?.role == "client";
+    const paddle_posy = isClient
+      ? this.world.paddle_right_posy
+      : this.world.paddle_left_posy;
+    const other_paddle_posy = isClient
+      ? this.world.paddle_left_posy
+      : this.world.paddle_right_posy;
+
+    let current_y = paddle_posy.get();
+    let next_y = current_y + this.paddle_input * PADDLE_SPEED * dt;
+    if (next_y > -950 + PADDLE_SIZE_Y / 2 && next_y < 950 - PADDLE_SIZE_Y / 2) {
+      paddle_posy.update_truth(next_y);
+    }
+
+    if (this.multiplayer != undefined) {
+      other_paddle_posy.predict();
+    } else {
+      other_paddle_posy.update_truth(this.world.ball_pos.get().y / 1000);
     }
 
     this.world.tick(20, 60, w - 40, h - 200, dt);
@@ -519,16 +599,17 @@ export class Game implements Scene {
 function ball_rect_collision(
   rect: ReturnType<Two["makeRectangle"]>,
   tx: number,
-  ty: number
-): Vector | null { // Returns a Normal Vector instead of boolean
+  ty: number,
+): Vector | null {
+  // Returns a Normal Vector instead of boolean
   const dx = tx - rect.position.x;
   const dy = ty - rect.position.y;
 
   const cos = Math.cos(-rect.rotation);
   const sin = Math.sin(-rect.rotation);
 
-  const localX = (dx * cos - dy * sin) + rect.origin.x;
-  const localY = (dx * sin + dy * cos) + rect.origin.y;
+  const localX = dx * cos - dy * sin + rect.origin.x;
+  const localY = dx * sin + dy * cos + rect.origin.y;
 
   const halfW = rect.width / 2;
   const halfH = rect.height / 2;
@@ -545,7 +626,8 @@ function ball_rect_collision(
   const distanceSquared = distX * distX + distY * distY;
 
   if (distanceSquared <= BALL_RADIUS * BALL_RADIUS) {
-    let nx = 0, ny = 0;
+    let nx = 0,
+      ny = 0;
 
     if (Math.abs(distX) > Math.abs(distY)) {
       nx = Math.sign(distX);
