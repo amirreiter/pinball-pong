@@ -1,16 +1,16 @@
 export class PIDController {
-  // Kp: Twitchiness. High = Aggressive tracking, Low = Lazy/Slow response.
+  // twitch
   private readonly sluggishKp: number = 0.035;
-  // Ki: Drift Correction. Fixes steady-state errors over long periods.
+  // drift correction
   private readonly sluggishKi: number = 0.00005;
-  // Kd: Smoothness (Braking). High = Precise stops, Low = Jittery overshooting.
+  // braking
   private readonly sluggishKd: number = 0.0003;
 
-  // Kp: Twitchiness. High = Aggressive tracking, Low = Lazy/Slow response.
+  // twitch
   private readonly twitchyKp: number = 0.025;
-  // Ki: Drift Correction. Fixes steady-state errors over long periods.
+  // drift correction
   private readonly twitchyKi: number = 0.0001;
-  // Kd: Smoothness (Braking). High = Precise stops, Low = Jittery overshooting.
+  // braking
   private readonly twitchyKd: number = 0.00000001;
 
   private target: number = 0;
