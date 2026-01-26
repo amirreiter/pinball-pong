@@ -8,11 +8,18 @@ import { Group } from "two.js/src/group";
 const PADDLE_SIZE_Y: number = 450;
 const PADDLE_SIZE_X: number = 38;
 const PADDLE_SPEED: number = 3;
+
 const BALL_RADIUS: number = 32;
 const BALL_SPEED: number = 0.9;
+const BALL_MAX_SPEED: number = BALL_SPEED * 2.5;
+const BALL_SLOWDOWN = 0.002;
 
 const BUTTON_OFF_COLOR = "#5A1A1A";
 const BUTTON_ON_COLOR = "#FF1A1A";
+
+const BOUNCER_RADIUS = 200;
+const BOUNCER_SPLIT = 500;
+const BOUNCE_SPEEDUP = 2;
 
 class World {
   private group: Group;
@@ -35,6 +42,9 @@ class World {
 
   public right_paddle_top_enabled: boolean = false;
   public right_paddle_bottom_enabled: boolean = false;
+
+  private bouncer1: ReturnType<Two["makeCircle"]>;
+  private bouncer2: ReturnType<Two["makeCircle"]>;
 
   constructor(ctx: Two) {
     this.group = ctx.makeGroup();
@@ -98,16 +108,47 @@ class World {
     this.paddle_right_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
     this.paddle_right_bottom.fill = "salmon";
     this.group.add(this.paddle_right_bottom);
+
+    this.bouncer1 = ctx.makeCircle(0, BOUNCER_SPLIT, BOUNCER_RADIUS);
+    this.bouncer1.fill = ctx.makeRadialGradient(0, 0, BOUNCER_RADIUS,
+      new Two.Stop(0, "#FFFFFF"),
+      new Two.Stop(1, "#C0C0C0")
+    );
+    this.group.add(this.bouncer1);
+
+    this.bouncer2 = ctx.makeCircle(0, -BOUNCER_SPLIT, BOUNCER_RADIUS);
+    this.bouncer2.fill = ctx.makeRadialGradient(0, 0, BOUNCER_RADIUS,
+      new Two.Stop(0, "#FFFFFF"),
+      new Two.Stop(1, "#C0C0C0")
+    );
+    this.group.add(this.bouncer2);
   }
 
   public tick(x: number, y: number, w: number, h: number, dt: number) {
     let s = Math.min(w, h) / 2;
-
     this.group.scale = s / 1000.0;
+    this.group.position.set(x + w / 2, y + this.group.getBoundingClientRect().height / 2);
 
-    const bounds = this.group.getBoundingClientRect();
+    // slow down the ball
+    const current_speed = this.ball_velocity.length();
+    if (current_speed > BALL_SPEED) {
+      const slowdown_vector = this.ball_velocity.clone().normalize().multiplyScalar(BALL_SLOWDOWN * dt);
+      if (slowdown_vector.length() < this.ball_velocity.length()) {
+        this.ball_velocity.sub(slowdown_vector);
+      } else {
+        this.ball_velocity.normalize().multiplyScalar(BALL_SPEED);
+      }
 
-    this.group.position.set(x + w / 2, y + bounds.height / 2);
+      if (this.ball_velocity.length() < BALL_SPEED + 0.01) {
+           this.ball_velocity.normalize().multiplyScalar(BALL_SPEED);
+      }
+    }
+
+    if (this.ball_velocity.length() > BALL_MAX_SPEED) {
+      this.ball_velocity.setLength(BALL_MAX_SPEED)
+    }
+
+    console.log(dt)
 
     let posy_left = this.paddle_left_posy.get();
     let posy_right = this.paddle_right_posy.get();
@@ -189,62 +230,49 @@ class World {
           velocity.sub(normal.clone().multiplyScalar(dot2));
         }
 
-        if (ball_rect_collision(this.paddle_left_top, predicted_x, predicted_y)) {
-          console.log("TOP LEFT");
-          let normal = new Vector(1, 0);
+        const processBounce = (paddle: any) => {
+          const normal = ball_rect_collision(paddle, new_pos.x, new_pos.y);
 
-          if (this.left_paddle_top_enabled) {
-            normal = new Vector(1, -1);
+          if (normal) {
+            const dot = velocity.dot(normal);
+
+            // only bounce if the ball is moving towards the face
+            if (dot < 0) {
+              const dot2 = dot * 2;
+              velocity.sub(normal.clone().multiplyScalar(dot2));
+              return true;
+            }
           }
+          return false;
+        };
 
-          normal.normalize();
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
-        } else if (
-          ball_rect_collision(this.paddle_left_bottom, predicted_x, predicted_y)
-        ) {
-          console.log("BOTTOM LEFT");
-          let normal = new Vector(1, 0);
-
-          if (this.left_paddle_bottom_enabled) {
-            normal = new Vector(1, 1);
-          }
-
-          normal.normalize();
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
+        if (!processBounce(this.paddle_left_top)) {
+          processBounce(this.paddle_left_bottom);
         }
 
-        if (ball_rect_collision(this.paddle_right_top, predicted_x, predicted_y)) {
-          let normal = new Vector(-1, 0);
+        if (!processBounce(this.paddle_right_top)) {
+          processBounce(this.paddle_right_bottom);
+        }
 
-          if (this.right_paddle_top_enabled) {
-            normal = new Vector(-1, -1);
+        const bounce1 = ball_circle_collision(this.bouncer1, new_pos.x, new_pos.y);
+        const bounce2 = ball_circle_collision(this.bouncer2, new_pos.x, new_pos.y);
+
+        const old_length = velocity.length()
+
+        if (bounce1 != null) {
+          const dot = velocity.dot(bounce1);
+          if (dot < 0) { // Only bounce if moving toward the surface
+            const dot2 = dot * 2;
+            velocity.sub(bounce1.clone().multiplyScalar(dot2));
+            velocity.normalize().multiplyScalar(BOUNCE_SPEEDUP * old_length);
           }
-
-          normal.normalize();
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
-        } else if (
-          ball_rect_collision(this.paddle_right_bottom, predicted_x, predicted_y)
-        ) {
-          let normal = new Vector(-1, 0);
-
-          if (this.right_paddle_bottom_enabled) {
-            normal = new Vector(-1, 1);
+        } else if (bounce2 != null) {
+          const dot = velocity.dot(bounce2);
+          if (dot < 0) { // Only bounce if moving toward the surface
+            const dot2 = dot * 2;
+            velocity.sub(bounce2.clone().multiplyScalar(dot2));
+            velocity.normalize().multiplyScalar(BOUNCE_SPEEDUP * old_length);
           }
-
-          normal.normalize();
-
-          const dot2 = velocity.dot(normal) * 2;
-
-          velocity.sub(normal.clone().multiplyScalar(dot2));
         }
 
         this.ball_velocity.set(velocity.x, velocity.y);
@@ -474,7 +502,6 @@ export class Game implements Scene {
     const linear =
       clamp(y - pos, rect.top - pos, rect.bottom - pos) / rect.height;
 
-    // const eased = clamp(Math.pow(linear, 0.3), -1, 1)
     const eased = Math.sign(linear) * Math.pow(Math.abs(linear), 0.2) * 0.6;
 
     this.paddle_input = eased;
@@ -484,27 +511,70 @@ export class Game implements Scene {
 function ball_rect_collision(
   rect: ReturnType<Two["makeRectangle"]>,
   tx: number,
-  ty: number,
-) {
+  ty: number
+): Vector | null { // Returns a Normal Vector instead of boolean
   const dx = tx - rect.position.x;
   const dy = ty - rect.position.y;
 
   const cos = Math.cos(-rect.rotation);
   const sin = Math.sin(-rect.rotation);
 
-  const unrotatedX = dx * cos - dy * sin;
-  const unrotatedY = dx * sin + dy * cos;
-
-  const localX = unrotatedX + rect.origin.x;
-  const localY = unrotatedY + rect.origin.y;
+  const localX = (dx * cos - dy * sin) + rect.origin.x;
+  const localY = (dx * sin + dy * cos) + rect.origin.y;
 
   const halfW = rect.width / 2;
   const halfH = rect.height / 2;
 
-  return (
-    localX >= -halfW &&
-    localX <=  halfW &&
-    localY >= -halfH &&
-    localY <=  halfH
-  );
+  if (localX > -halfW && localX < halfW && localY > -halfH && localY < halfH) {
+    return null;
+  }
+
+  const closestX = Math.max(-halfW, Math.min(localX, halfW));
+  const closestY = Math.max(-halfH, Math.min(localY, halfH));
+
+  const distX = localX - closestX;
+  const distY = localY - closestY;
+  const distanceSquared = distX * distX + distY * distY;
+
+  if (distanceSquared <= BALL_RADIUS * BALL_RADIUS) {
+    let nx = 0, ny = 0;
+
+    if (Math.abs(distX) > Math.abs(distY)) {
+      nx = Math.sign(distX);
+    } else {
+      ny = Math.sign(distY);
+    }
+
+    const worldNX = nx * Math.cos(rect.rotation) - ny * Math.sin(rect.rotation);
+    const worldNY = nx * Math.sin(rect.rotation) + ny * Math.cos(rect.rotation);
+
+    return new Vector(worldNX, worldNY);
+  }
+
+  return null;
+}
+
+function ball_circle_collision(
+  circ: ReturnType<Two["makeCircle"]>,
+  tx: number,
+  ty: number,
+): Vector | null {
+  const dx = tx - circ.position.x;
+  const dy = ty - circ.position.y;
+  const distanceSquared = dx * dx + dy * dy;
+  const distance = Math.sqrt(distanceSquared);
+
+  if (distance < circ.radius - BALL_RADIUS) {
+    return null;
+  }
+
+  if (distance <= circ.radius + BALL_RADIUS) {
+    if (distance < 0.001) {
+      return new Vector(1, 0);
+    }
+    const normal = new Vector(dx / distance, dy / distance);
+    return normal.normalize();
+  }
+
+  return null;
 }
