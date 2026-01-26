@@ -183,7 +183,7 @@ class World {
     // Left top
     if (this.left_flip_top) {
       this.paddle_left_top.position.x = -900 + 100;
-      this.paddle_left_top.position.y += -40;
+      this.paddle_left_top.position.y += -50;
       this.paddle_left_top.rotation = -Math.PI / 4;
     } else {
       this.paddle_left_top.position.x = -900;
@@ -192,7 +192,7 @@ class World {
 
     if (this.left_flip_bottom) {
       this.paddle_left_bottom.position.x = -900 + 100;
-      this.paddle_left_bottom.position.y += 40;
+      this.paddle_left_bottom.position.y += 50;
       this.paddle_left_bottom.rotation = Math.PI / 4;
     } else {
       this.paddle_left_bottom.position.x = -900;
@@ -202,7 +202,7 @@ class World {
     // Left bottom
     if (this.right_flip_top) {
       this.paddle_right_top.position.x = 900 - 100;
-      this.paddle_right_top.position.y += -40;
+      this.paddle_right_top.position.y += -50;
       this.paddle_right_top.rotation = Math.PI / 4;
     } else {
       this.paddle_right_top.position.x = 900;
@@ -211,7 +211,7 @@ class World {
 
     if (this.right_flip_bottom) {
       this.paddle_right_bottom.position.x = 900 - 100;
-      this.paddle_right_bottom.position.y += 40;
+      this.paddle_right_bottom.position.y += 50;
       this.paddle_right_bottom.rotation = -Math.PI / 4;
     } else {
       this.paddle_right_bottom.position.x = 900;
