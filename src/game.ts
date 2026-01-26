@@ -110,16 +110,24 @@ class World {
     this.group.add(this.paddle_right_bottom);
 
     this.bouncer1 = ctx.makeCircle(0, BOUNCER_SPLIT, BOUNCER_RADIUS);
-    this.bouncer1.fill = ctx.makeRadialGradient(0, 0, BOUNCER_RADIUS,
-      new Two.Stop(0, "#FFFFFF"),
-      new Two.Stop(1, "#C0C0C0")
+    this.bouncer1.fill = ctx.makeRadialGradient(0.5, 0.5, 0.5,
+      new Two.Stop(0, "#CFCFCF"),
+      new Two.Stop(0.4, "#BFBFBF"),
+      new Two.Stop(0.88, "#9F9F9F"),
+      new Two.Stop(0.93, "#000000"),
+      new Two.Stop(0.98, "#CF5F5F"),
+      new Two.Stop(1, "#CF5F5F"),
     );
     this.group.add(this.bouncer1);
 
     this.bouncer2 = ctx.makeCircle(0, -BOUNCER_SPLIT, BOUNCER_RADIUS);
-    this.bouncer2.fill = ctx.makeRadialGradient(0, 0, BOUNCER_RADIUS,
-      new Two.Stop(0, "#FFFFFF"),
-      new Two.Stop(1, "#C0C0C0")
+    this.bouncer2.fill = ctx.makeRadialGradient(0.5, 0.5, 0.5,
+      new Two.Stop(0, "#CFCFCF"),
+      new Two.Stop(0.4, "#BFBFBF"),
+      new Two.Stop(0.88, "#9F9F9F"),
+      new Two.Stop(0.93, "#000000"),
+      new Two.Stop(0.98, "#CF5F5F"),
+      new Two.Stop(1, "#CF5F5F"),
     );
     this.group.add(this.bouncer2);
   }
