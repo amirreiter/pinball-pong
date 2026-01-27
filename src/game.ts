@@ -128,7 +128,7 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_left_top.origin.set(0, PADDLE_SIZE_Y / 4);
-    this.paddle_left_top.fill = player_side == "left" ? "palegreen" : "salmon";
+    this.paddle_left_top.fill = player_side == "left" ? "white" : "salmon";
     this.group.add(this.paddle_left_top);
 
     this.paddle_left_bottom = ctx.makeRectangle(
@@ -139,7 +139,7 @@ class World {
     );
     this.paddle_left_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
     this.paddle_left_bottom.fill =
-      player_side == "left" ? "palegreen" : "salmon";
+      player_side == "left" ? "white" : "salmon";
     this.group.add(this.paddle_left_bottom);
 
     // Paddle (right)
@@ -784,7 +784,7 @@ export class Game implements Scene {
     const linear =
       clamp(y - pos, rect.top - pos, rect.bottom - pos) / rect.height;
 
-    const eased = Math.sign(linear) * Math.pow(Math.abs(linear), 0.2) * 0.6;
+    const eased = Math.sign(linear) * Math.pow(Math.abs(linear), 0.5) * 0.6;
 
     this.paddle_input = eased;
   }
