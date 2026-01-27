@@ -83,8 +83,8 @@ export class NetVector {
 
 export class MultiplayerSession {
   public readonly role: MultiplayerRole;
-  private pc: RTCPeerConnection;
-  private channel: RTCDataChannel;
+  public readonly pc: RTCPeerConnection;
+  public readonly channel: RTCDataChannel;
 
   private last_timestamp: EpochTimeStamp;
 

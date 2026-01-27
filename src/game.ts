@@ -7,6 +7,7 @@ import { Group } from "two.js/src/group";
 import { EndScene } from "./end";
 import { CTX_RESET } from "./main";
 import { PIDController } from "./ai";
+import { MenuScene } from "./menu";
 
 const SCORE_VICTORY = 200;
 const SCORE_GOAL = 25;
@@ -138,8 +139,7 @@ class World {
       PADDLE_SIZE_Y / 2,
     );
     this.paddle_left_bottom.origin.set(0, -PADDLE_SIZE_Y / 4);
-    this.paddle_left_bottom.fill =
-      player_side == "left" ? "white" : "salmon";
+    this.paddle_left_bottom.fill = player_side == "left" ? "white" : "salmon";
     this.group.add(this.paddle_left_bottom);
 
     // Paddle (right)
@@ -624,6 +624,15 @@ export class Game implements Scene {
       return new EndScene(ctx, won, score);
     }
 
+    if (this.multiplayer != undefined) {
+      if (
+        this.multiplayer?.channel.readyState != "open" ||
+        this.multiplayer?.pc.connectionState != "connected"
+      ) {
+        return new MenuScene(ctx);
+      }
+    }
+
     let w = ctx.width;
     let h = ctx.height;
 
@@ -772,9 +781,9 @@ export class Game implements Scene {
     const key = char.toLowerCase();
 
     if (key === "w") {
-      this.paddle_input = -0.45;
+      this.paddle_input = -0.4;
     } else if (key === "s") {
-      this.paddle_input = 0.45;
+      this.paddle_input = 0.4;
     }
 
     if (key === "i") {
@@ -788,7 +797,10 @@ export class Game implements Scene {
   input_keypress_end(char: string): null {
     const key = char.toLowerCase();
 
-    if ((key === "w" && this.paddle_input < 0) || (key === "s" && this.paddle_input > 0)) {
+    if (
+      (key === "w" && this.paddle_input < 0) ||
+      (key === "s" && this.paddle_input > 0)
+    ) {
       this.paddle_input = 0;
     }
 
