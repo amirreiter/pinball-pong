@@ -4,14 +4,14 @@ export class PIDController {
   // drift correction
   private readonly sluggishKi: number = 0.00005;
   // braking
-  private readonly sluggishKd: number = 0.0003;
+  private readonly sluggishKd: number = 0.003;
 
   // twitch
   private readonly twitchyKp: number = 0.025;
   // drift correction
   private readonly twitchyKi: number = 0.0001;
   // braking
-  private readonly twitchyKd: number = 0.00000001;
+  private readonly twitchyKd: number = 0.0001;
 
   private target: number = 0;
   private integral: number = 0;
