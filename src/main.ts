@@ -1,4 +1,4 @@
-import adapter from 'webrtc-adapter';
+import adapter from "webrtc-adapter";
 
 import Two from "two.js";
 
@@ -37,21 +37,41 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   window.current_scene = new MenuScene(TWO);
 
-  TWO.bind("update", (frameCount: number, dt: number) => {
-    const maybe_scene = window.current_scene.tick(TWO, frameCount, dt);
-
-    if (maybe_scene !== null) {
-      window.current_scene = maybe_scene;
-      window.current_scene.tick(TWO, frameCount, dt);
-    }
-  });
-
   // multi touch state
   let leftTouchId: number | null = null;
   let rightTouchId: number | null = null;
   let mouseDragging: { isLeft: boolean } | null = null;
 
-  const isLeftSide = (x: number) => x < window.innerWidth / 2;
+  const resetInputState = () => {
+    leftTouchId = null;
+    rightTouchId = null;
+    mouseDragging = null;
+  };
+
+  TWO.bind("update", (frameCount: number, dt: number) => {
+    const maybe_scene = window.current_scene.tick(TWO, frameCount, dt);
+
+    if (maybe_scene !== null) {
+      window.current_scene = maybe_scene;
+      resetInputState();
+      window.current_scene.tick(TWO, frameCount, dt);
+    }
+  });
+
+  const getCanvasRect = () => {
+    const domElement =
+      (TWO.renderer as { domElement?: Element | null }).domElement ??
+      GAME_CONTAINER.querySelector("canvas");
+    return (
+      domElement?.getBoundingClientRect() ??
+      GAME_CONTAINER.getBoundingClientRect()
+    );
+  };
+
+  const isLeftSide = (x: number) => {
+    const rect = getCanvasRect();
+    return x < rect.left + rect.width / 2;
+  };
 
   const handleMouseDown = async (e: MouseEvent) => {
     await window.sfx.unlock();
