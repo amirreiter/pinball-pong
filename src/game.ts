@@ -772,9 +772,9 @@ export class Game implements Scene {
     const key = char.toLowerCase();
 
     if (key === "w") {
-      this.paddle_input = -0.5;
+      this.paddle_input = -0.45;
     } else if (key === "s") {
-      this.paddle_input = 0.5;
+      this.paddle_input = 0.45;
     }
 
     if (key === "i") {
