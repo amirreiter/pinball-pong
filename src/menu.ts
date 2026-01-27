@@ -9,6 +9,19 @@ import { Game } from "./game";
 import { MultiplayerSession } from "./multiplayer";
 import { CTX_RESET } from "./main";
 
+const iceServers = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun.l.google.com:5349" },
+    { urls: "stun:stun1.l.google.com:3478" },
+    { urls: "stun:stun1.l.google.com:5349" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:5349" },
+    { urls: "stun:stun3.l.google.com:3478" },
+    { urls: "stun:stun3.l.google.com:5349" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:5349" }
+];
+
 function generate_invite(sdp: string): string {
   const encoder = new TextEncoder();
   const payload = encoder.encode(sdp);
@@ -198,14 +211,7 @@ export class MenuScene implements Scene {
         }
 
         const pc = new RTCPeerConnection({
-          iceServers: [
-            {
-              urls: [
-                "stun:stun.l.google.com:19302",
-                "stun:stun1.l.google.com:19302",
-              ],
-            },
-          ],
+          iceServers
         });
 
         let data_channel = pc.createDataChannel("pong");
@@ -320,14 +326,7 @@ export class MenuScene implements Scene {
 
         // Set up WebRTC
         const pc = new RTCPeerConnection({
-          iceServers: [
-            {
-              urls: [
-                "stun:stun.l.google.com:19302",
-                "stun:stun1.l.google.com:19302",
-              ],
-            },
-          ],
+          iceServers
         });
         pc.ondatachannel = (event) => {
           const data_channel = event.channel;
