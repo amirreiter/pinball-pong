@@ -1,3 +1,5 @@
+import adapter from 'webrtc-adapter';
+
 import Two from "two.js";
 
 import { Scene } from "./scene";

@@ -701,7 +701,7 @@ export class Game implements Scene {
     let current_y = paddle_posy.get();
     let next_y = current_y + this.paddle_input * PADDLE_SPEED * dt;
     if (next_y > -950 + PADDLE_SIZE_Y / 2 && next_y < 950 - PADDLE_SIZE_Y / 2) {
-      console.log("PLAYER   " + next_y);
+      // console.log("PLAYER   " + next_y);
       paddle_posy.update_truth(next_y);
     }
 
@@ -729,7 +729,7 @@ export class Game implements Scene {
       );
       const aiY = minY + (normalizedAI + 1) * 0.5 * (maxY - minY);
 
-      console.log("AI   " + aiY);
+      // console.log("AI   " + aiY);
       this.world.paddle_right_posy.update_truth(aiY);
     }
 

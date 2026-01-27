@@ -1,41 +1,35 @@
 import Two from "two.js";
 import QRCode from "qrcode";
 import { Html5Qrcode } from "html5-qrcode";
-import * as lz4 from "@nick/lz4";
 import { encode as b64encode, decode as b64decode } from "uint8-base64";
+
+import { compress, decompress } from 'brotli-compress'
 
 import { Scene } from "./scene";
 import { Game } from "./game";
 import { MultiplayerSession } from "./multiplayer";
 import { CTX_RESET } from "./main";
 
-const iceServers = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun.l.google.com:5349" },
-    { urls: "stun:stun1.l.google.com:3478" },
-    { urls: "stun:stun1.l.google.com:5349" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:5349" },
-    { urls: "stun:stun3.l.google.com:3478" },
-    { urls: "stun:stun3.l.google.com:5349" },
-    { urls: "stun:stun4.l.google.com:19302" },
-    { urls: "stun:stun4.l.google.com:5349" }
+const iceServers: RTCIceServer[] = [
+  {
+    urls: "stun:stun1.l.google.com:19302",
+  },
 ];
 
-function generate_invite(sdp: string): string {
+async function generate_invite(sdp: string): Promise<string> {
   const encoder = new TextEncoder();
   const payload = encoder.encode(sdp);
-  const payload_lz4 = lz4.compress(payload);
-  const payload_lz4_b64 = b64encode(payload_lz4);
+  const payload_xs = await compress(payload, { quality: 11  });
+  const payload_xs_b64 = b64encode(payload_xs);
 
-  return new TextDecoder("utf8").decode(payload_lz4_b64);
+  return new TextDecoder("utf8").decode(payload_xs_b64);
 }
 
-function parse_invite(invite: string): string {
+async function parse_invite(invite: string): Promise<string> {
   const encoder = new TextEncoder();
   const invite_bytes = encoder.encode(invite);
-  const payload_lz4 = b64decode(invite_bytes);
-  const payload = lz4.decompress(payload_lz4);
+  const payload_xs = b64decode(invite_bytes);
+  const payload = await decompress(payload_xs);
 
   return new TextDecoder("utf8").decode(payload);
 }
@@ -211,7 +205,7 @@ export class MenuScene implements Scene {
         }
 
         const pc = new RTCPeerConnection({
-          iceServers
+          iceServers,
         });
 
         let data_channel = pc.createDataChannel("pong");
@@ -229,12 +223,12 @@ export class MenuScene implements Scene {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        pc.onicegatheringstatechange = () => {
+        pc.onicegatheringstatechange = async () => {
           if (pc.iceGatheringState === "complete") {
             //
             // HOST INVITE GENERATION
             //
-            const invite = generate_invite(offer.sdp!);
+            const invite = await generate_invite(offer.sdp!);
 
             document.body.insertAdjacentHTML(
               "afterbegin",
@@ -300,7 +294,7 @@ export class MenuScene implements Scene {
 
                         await pc.setRemoteDescription({
                           type: "answer",
-                          sdp: parse_invite(text),
+                          sdp: await parse_invite(text),
                         });
                       },
                       (_err) => {},
@@ -326,7 +320,7 @@ export class MenuScene implements Scene {
 
         // Set up WebRTC
         const pc = new RTCPeerConnection({
-          iceServers
+          iceServers,
         });
         pc.ondatachannel = (event) => {
           const data_channel = event.channel;
@@ -370,7 +364,7 @@ export class MenuScene implements Scene {
             document.body.querySelector("#qr-reader")!.remove();
             await html5QrCode.stop();
 
-            const sdp = parse_invite(text);
+            const sdp = await parse_invite(text);
 
             await pc.setRemoteDescription({
               type: "offer",
@@ -379,11 +373,11 @@ export class MenuScene implements Scene {
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            pc.onicegatheringstatechange = () => {
+            pc.onicegatheringstatechange = async () => {
               if (pc.iceGatheringState === "complete") {
                 const answerSdp = pc.localDescription!.sdp;
 
-                const invite_answer = generate_invite(answerSdp);
+                const invite_answer = await generate_invite(answerSdp);
 
                 //
                 // CLIENT INVITE GENERATION

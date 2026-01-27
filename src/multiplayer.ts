@@ -117,9 +117,9 @@ export class MultiplayerSession {
 
       if (real_checksum != checksum && timestamp <= this.last_timestamp) {
         if (real_checksum != checksum) {
-          console.log("Checksum rejected");
+          console.warn("Checksum rejected");
         } else {
-          console.log("Timestamp too old!");
+          console.warn("Timestamp too old!");
         }
         // Throw away old or corrupted packets
         return;
