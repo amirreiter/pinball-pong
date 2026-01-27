@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Html5Qrcode } from "html5-qrcode";
 import { encode as b64encode, decode as b64decode } from "uint8-base64";
 
-import { compress, decompress } from 'brotli-compress'
+import { compress, decompress } from "brotli-compress";
 
 import { Scene } from "./scene";
 import { Game } from "./game";
@@ -19,7 +19,7 @@ const iceServers: RTCIceServer[] = [
 async function generate_invite(sdp: string): Promise<string> {
   const encoder = new TextEncoder();
   const payload = encoder.encode(sdp);
-  const payload_xs = await compress(payload, { quality: 11  });
+  const payload_xs = await compress(payload, { quality: 11 });
   const payload_xs_b64 = b64encode(payload_xs);
 
   return new TextDecoder("utf8").decode(payload_xs_b64);

@@ -83,5 +83,11 @@ export class EndScene implements Scene {
   input_end(pos: { x: number; y: number; }): null {
     return null;
   }
+  input_keypress(char: string): null {
+    return null;
+  }
+  input_keypress_end(char: string): null {
+    return null;
+  }
 
 }

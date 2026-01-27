@@ -6,4 +6,6 @@ export interface Scene {
   input_start(pos: { x: number; y: number }, isLeft: boolean): null;
   input_drag(pos: { x: number; y: number }, isDragging: boolean, isLeft: boolean): null;
   input_end(pos: { x: number; y: number }, isLeft: boolean): null;
+  input_keypress?(char: string): null;
+  input_keypress_end?(char: string): null;
 }

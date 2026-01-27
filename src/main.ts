@@ -151,6 +151,14 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   };
 
+  const handleKeyDown = (e: KeyboardEvent) => {
+    window.current_scene.input_keypress?.(e.key);
+  };
+
+  const handleKeyUp = (e: KeyboardEvent) => {
+    window.current_scene.input_keypress_end?.(e.key);
+  };
+
   window.addEventListener("mousedown", handleMouseDown);
   window.addEventListener("mousemove", handleMouseMove);
   window.addEventListener("mouseup", handleMouseUp);
@@ -158,6 +166,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   window.addEventListener("touchmove", handleTouchMove, { passive: false });
   window.addEventListener("touchend", handleTouchEnd, { passive: false });
   window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
+  window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("keyup", handleKeyUp);
 });
 
 export function CTX_RESET(ctx: Two) {

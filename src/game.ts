@@ -768,6 +768,40 @@ export class Game implements Scene {
     return null;
   }
 
+  input_keypress(char: string): null {
+    const key = char.toLowerCase();
+
+    if (key === "w") {
+      this.paddle_input = -0.5;
+    } else if (key === "s") {
+      this.paddle_input = 0.5;
+    }
+
+    if (key === "i") {
+      this.flipper_control = "top";
+    } else if (key === "j") {
+      this.flipper_control = "bottom";
+    }
+
+    return null;
+  }
+  input_keypress_end(char: string): null {
+    const key = char.toLowerCase();
+
+    if ((key === "w" && this.paddle_input < 0) || (key === "s" && this.paddle_input > 0)) {
+      this.paddle_input = 0;
+    }
+
+    if (
+      (key === "i" && this.flipper_control === "top") ||
+      (key === "j" && this.flipper_control === "bottom")
+    ) {
+      this.flipper_control = false;
+    }
+
+    return null;
+  }
+
   private grab_slider(x: number, y: number) {
     const rect = this.slider_bg.getBoundingClientRect(true);
 
