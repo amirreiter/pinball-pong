@@ -44,47 +44,98 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
-  const getEventPosition = (e: MouseEvent | TouchEvent) => {
-    if ("touches" in e) {
-      const t = e.touches[0] || e.changedTouches[0];
-      return { x: t.clientX, y: t.clientY };
-    }
-    return { x: e.clientX, y: e.clientY };
-  };
+  // multi touch state
+  let leftTouchId: number | null = null;
+  let rightTouchId: number | null = null;
+  let mouseDragging: { isLeft: boolean } | null = null;
 
-  let isDragging = false;
+  const isLeftSide = (x: number) => x < window.innerWidth / 2;
 
-  const handleDown = async (e: MouseEvent | TouchEvent) => {
+  const handleMouseDown = async (e: MouseEvent) => {
     await window.sfx.unlock();
     e.preventDefault();
-    const pos = getEventPosition(e);
-    isDragging = true;
-    window.current_scene.input_start(pos);
-    window.current_scene.input_drag(pos, isDragging);
+    const pos = { x: e.clientX, y: e.clientY };
+    const isLeft = isLeftSide(pos.x);
+    mouseDragging = { isLeft };
+    window.current_scene.input_start(pos, isLeft);
+    window.current_scene.input_drag(pos, true, isLeft);
   };
 
-  const handleDrag = (e: MouseEvent | TouchEvent) => {
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!mouseDragging) return;
     e.preventDefault();
-    const pos = getEventPosition(e);
-    window.current_scene.input_drag(pos, isDragging);
+    const pos = { x: e.clientX, y: e.clientY };
+    window.current_scene.input_drag(pos, true, mouseDragging.isLeft);
   };
 
-  const handleUp = (e: MouseEvent | TouchEvent) => {
-    if (!isDragging) return;
+  const handleMouseUp = (e: MouseEvent) => {
+    if (!mouseDragging) return;
     e.preventDefault();
-    const pos = getEventPosition(e);
-    isDragging = false;
-    window.current_scene.input_end(pos);
+    const pos = { x: e.clientX, y: e.clientY };
+    window.current_scene.input_end(pos, mouseDragging.isLeft);
+    mouseDragging = null;
   };
 
-  window.addEventListener("mousedown", handleDown);
-  window.addEventListener("mousemove", handleDrag);
-  window.addEventListener("mouseup", handleUp);
-  window.addEventListener("mousemove", handleDrag);
-  window.addEventListener("touchstart", handleDown, { passive: false });
-  window.addEventListener("touchmove", handleDrag, { passive: false });
-  window.addEventListener("touchend", handleUp, { passive: false });
-  window.addEventListener("touchcancel", handleUp, { passive: false });
+  const handleTouchStart = async (e: TouchEvent) => {
+    await window.sfx.unlock();
+    e.preventDefault();
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      const pos = { x: touch.clientX, y: touch.clientY };
+      const isLeft = isLeftSide(pos.x);
+
+      if (isLeft && leftTouchId === null) {
+        leftTouchId = touch.identifier;
+        window.current_scene.input_start(pos, true);
+        window.current_scene.input_drag(pos, true, true);
+      } else if (!isLeft && rightTouchId === null) {
+        rightTouchId = touch.identifier;
+        window.current_scene.input_start(pos, false);
+        window.current_scene.input_drag(pos, true, false);
+      }
+    }
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    e.preventDefault();
+
+    for (let i = 0; i < e.touches.length; i++) {
+      const touch = e.touches[i];
+      const pos = { x: touch.clientX, y: touch.clientY };
+
+      if (touch.identifier === leftTouchId) {
+        window.current_scene.input_drag(pos, true, true);
+      } else if (touch.identifier === rightTouchId) {
+        window.current_scene.input_drag(pos, true, false);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    e.preventDefault();
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      const pos = { x: touch.clientX, y: touch.clientY };
+
+      if (touch.identifier === leftTouchId) {
+        window.current_scene.input_end(pos, true);
+        leftTouchId = null;
+      } else if (touch.identifier === rightTouchId) {
+        window.current_scene.input_end(pos, false);
+        rightTouchId = null;
+      }
+    }
+  };
+
+  window.addEventListener("mousedown", handleMouseDown);
+  window.addEventListener("mousemove", handleMouseMove);
+  window.addEventListener("mouseup", handleMouseUp);
+  window.addEventListener("touchstart", handleTouchStart, { passive: false });
+  window.addEventListener("touchmove", handleTouchMove, { passive: false });
+  window.addEventListener("touchend", handleTouchEnd, { passive: false });
+  window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 });
 
 export function CTX_RESET(ctx: Two) {

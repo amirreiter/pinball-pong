@@ -708,7 +708,10 @@ export class Game implements Scene {
     if (this.multiplayer) {
       other_paddle_posy.predict();
     } else {
-      this.ai.setTarget(this.world.ball_pos.get().y, this.world.ball_velocity.x > 0);
+      this.ai.setTarget(
+        this.world.ball_pos.get().y,
+        this.world.ball_velocity.x > 0,
+      );
       const aiOut = this.ai.predict(dt); // returns the predicted Y position
       const clamp = (num: number, min: number, max: number) =>
         Math.min(Math.max(num, min), max);
@@ -717,8 +720,14 @@ export class Game implements Scene {
       const maxY = 950 - PADDLE_SIZE_Y / 2;
 
       // aiOut is in [-1, 1]; map it into the paddle's Y range
-      const normalizedAI = clamp(aiOut + Math.sin(frameCount * 0.07) * 0.03 + Math.sin(frameCount * 0.05) * 0.04, -1, 1);
-      const aiY = minY + ((normalizedAI + 1) * 0.5) * (maxY - minY);
+      const normalizedAI = clamp(
+        aiOut +
+          Math.sin(frameCount * 0.07) * 0.03 +
+          Math.sin(frameCount * 0.05) * 0.04,
+        -1,
+        1,
+      );
+      const aiY = minY + (normalizedAI + 1) * 0.5 * (maxY - minY);
 
       console.log("AI   " + aiY);
       this.world.paddle_right_posy.update_truth(aiY);
@@ -727,23 +736,35 @@ export class Game implements Scene {
     this.world.tick(20, 60, w - 40, h - 200, dt);
     return null;
   }
-  input_start(pos: { x: number; y: number }): null {
-    if (this.top_btn.contains(pos.x, pos.y)) {
-      this.flipper_control = "top";
-    } else if (this.bottom_btn.contains(pos.x, pos.y)) {
-      this.flipper_control = "bottom";
+  input_start(pos: { x: number; y: number }, isLeft: boolean): null {
+    if (isLeft) {
+      if (this.top_btn.contains(pos.x, pos.y)) {
+        this.flipper_control = "top";
+      } else if (this.bottom_btn.contains(pos.x, pos.y)) {
+        this.flipper_control = "bottom";
+      }
+    } else {
+      this.grab_slider(pos.x, pos.y);
+    }
+    return null;
+  }
+  input_drag(
+    pos: { x: number; y: number },
+    isDragging: boolean,
+    isLeft: boolean,
+  ): null {
+    if (!isLeft) {
+      this.grab_slider(pos.x, pos.y);
+    }
+    return null;
+  }
+  input_end(pos: { x: number; y: number }, isLeft: boolean): null {
+    if (isLeft) {
+      this.flipper_control = false;
+    } else {
+      this.paddle_input = 0;
     }
 
-    this.grab_slider(pos.x, pos.y);
-    return null;
-  }
-  input_drag(pos: { x: number; y: number }, isDragging: boolean): null {
-    this.grab_slider(pos.x, pos.y);
-    return null;
-  }
-  input_end(pos: { x: number; y: number }): null {
-    this.paddle_input = 0;
-    this.flipper_control = false;
     return null;
   }
 
