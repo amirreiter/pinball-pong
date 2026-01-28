@@ -624,7 +624,7 @@ export class Game implements Scene {
       return new EndScene(ctx, won, score);
     }
 
-    if (this.multiplayer != undefined) {
+    if (this.multiplayer) {
       if (
         this.multiplayer?.channel.readyState != "open" ||
         this.multiplayer?.pc.connectionState != "connected"
